@@ -50,8 +50,9 @@ function App() {
 
   return (
     <Routes>
-      {/* Rota para a página mobile de recebimento de produtos */}
+      {/* Rotas para a página mobile de recebimento de produtos */}
       <Route path="/mobile/receive" element={<MobileReceive />} />
+      <Route path="/mobile-receive" element={<MobileReceive />} />
       
       {/* Rotas principais com Layout */}
       <Route path="/" element={<Layout><Dashboard /></Layout>} />
