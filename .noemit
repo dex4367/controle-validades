@@ -1,0 +1,1 @@
+// Este arquivo serve para sinalizar ao TypeScript que não queremos verificar códigos não utilizados durante o build 
