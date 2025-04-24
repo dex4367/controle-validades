@@ -1,0 +1,11 @@
+/* Este arquivo importa e customiza o DatePicker */
+@import '../../node_modules/react-datepicker/dist/react-datepicker.css';
+
+/* Customizações adicionais para o DatePicker podem ser adicionadas aqui */
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+.react-datepicker__input-container input {
+  width: 100%;
+} 

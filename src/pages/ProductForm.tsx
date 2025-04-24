@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import DatePicker from 'react-datepicker'
-import "react-datepicker/dist/react-datepicker.css"
+// Usando o arquivo CSS personalizado
+import '../styles/datepicker.css'
 import { 
   getProduct, 
   createProduct, 

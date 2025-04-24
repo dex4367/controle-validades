@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/library'
 import { getProductByBarcode, createProduct, getCategories } from '../services/supabase'
 import DatePicker from 'react-datepicker'
-import "react-datepicker/dist/react-datepicker.css"
+// Usando o arquivo CSS personalizado
+import '../styles/datepicker.css'
 // Importando ícones modernos
 import { 
   FaBarcode, 
