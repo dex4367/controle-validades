@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  
+  /* Cores do tema BR Mania */
+  --brmania-green: #009A3D;
+  --brmania-yellow: #FFCC29;
+  --brmania-dark: #1F2937;
+  --brmania-light: #F9FAFB;
+  --brmania-accent: #FF671F;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--brmania-light);
+  color: var(--brmania-dark);
+} 
