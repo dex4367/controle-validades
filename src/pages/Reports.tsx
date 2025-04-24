@@ -1,11 +1,13 @@
 ﻿import { useState, useEffect } from 'react'
-import { getProducts, Product, deleteProduct } from '../services/supabase'
 import { 
+  getProducts, 
+  Product, 
+  deleteProduct, 
   generateProductsReport, 
-  generateExpiringProductsReport,
-  isExpired,
+  generateExpiringProductsReport, 
+  isExpired, 
   calculateDaysRemaining
-} from '../services/reports'
+} from '../services'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 // Importando ícones modernos

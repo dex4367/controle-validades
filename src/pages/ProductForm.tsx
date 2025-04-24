@@ -8,7 +8,10 @@ import {
   createCategory,
   uploadProductImage,
   getProductsByBarcode
-} from '../services/supabase'
+} from '../services'
+import { Product } from '../services/supabase'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
 
 const ProductForm = () => {
   const { id } = useParams<{ id: string }>()

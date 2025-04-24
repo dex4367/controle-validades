@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { getProducts, deleteProduct } from '../services/supabase'
-import { isExpired, calculateDaysRemaining, exportFilteredProducts } from '../services/reports'
+import { isExpired, calculateDaysRemaining } from '../utils/dateUtils'
+import { exportFilteredProducts } from '../services/reports'
 // Importando ícones modernos
 import {
   FaPlus,
