@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { getProducts, Product, deleteProduct } from '../services/supabase'
 import { 
   generateProductsReport, 
@@ -8,7 +8,6 @@ import {
 } from '../services/reports'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { deduplicateProductsByName } from '../utils/productUtils'
 // Importando ícones modernos
 import {
   FaFilePdf,

@@ -42,7 +42,7 @@ async function removeDuplicateProducts(actuallyDelete = false): Promise<Duplicat
     
     // 3. Identificar grupos de produtos com o mesmo nome
     const duplicateGroups = Object.entries(productsByName)
-      .filter(([name, group]) => group.length > 1)
+      .filter(([_, group]) => group.length > 1)
       .map(([name, group]) => ({
         name,
         count: group.length,

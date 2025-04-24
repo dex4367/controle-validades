@@ -7,7 +7,6 @@ import {
   getCategories, 
   createCategory,
   uploadProductImage,
-  getProductByBarcode,
   getProductsByBarcode
 } from '../services/supabase'
 

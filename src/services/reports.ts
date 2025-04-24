@@ -1,5 +1,4 @@
 import * as XLSX from 'xlsx'
-import { Product } from './supabase'
 
 interface ExportOptions {
   fileName?: string
