@@ -23,6 +23,12 @@ export default defineConfig({
     commonjsOptions: {
       transformMixedEsModules: true,
     },
+    rollupOptions: {
+      external: [
+        // Adicionar o CSS do react-datepicker como externo para evitar erro de build
+        'react-datepicker/dist/react-datepicker.css'
+      ]
+    }
   },
   esbuild: {
     // Ignorar erros de TypeScript durante a compilação
