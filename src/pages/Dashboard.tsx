@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { getProducts } from '../services/supabase'
-import { isExpired, calculateDaysRemaining } from '../services/reports.ts'
+import { isExpired, calculateDaysRemaining } from '../services/reports'
 // Importando ícones modernos
 import { 
   FaBoxOpen, 
