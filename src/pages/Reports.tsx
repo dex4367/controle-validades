@@ -2,11 +2,11 @@
 import { 
   getProducts, 
   Product, 
-  deleteProduct, 
+  deleteProduct,
+  isExpired,
+  calculateDaysRemaining,
   generateProductsReport, 
-  generateExpiringProductsReport, 
-  isExpired, 
-  calculateDaysRemaining
+  generateExpiringProductsReport
 } from '../services'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'

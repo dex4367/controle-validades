@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import DatePicker from 'react-datepicker'
+import "react-datepicker/dist/react-datepicker.css"
 import { 
   getProduct, 
   createProduct, 
@@ -8,10 +10,7 @@ import {
   createCategory,
   uploadProductImage,
   getProductsByBarcode
-} from '../services'
-import { Product } from '../services/supabase'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
+} from '../services/supabase'
 
 const ProductForm = () => {
   const { id } = useParams<{ id: string }>()
@@ -27,6 +26,7 @@ const ProductForm = () => {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [existingBarcodeProducts, setExistingBarcodeProducts] = useState<any[]>([])
   const [showExistingProducts, setShowExistingProducts] = useState(false)
+  const [expiryDate, setExpiryDate] = useState<Date>(new Date())
 
   // Estado do produto
   const [product, setProduct] = useState({
@@ -74,6 +74,10 @@ const ProductForm = () => {
       const data = await getProduct(parseInt(id))
       
       if (data) {
+        // Convertendo a string de data para objeto Date para o DatePicker
+        const expDate = new Date(data.expiry_date)
+        setExpiryDate(expDate)
+        
         setProduct({
           name: data.name,
           barcode: data.barcode || '',
@@ -205,6 +209,15 @@ const ProductForm = () => {
     }
     
     setShowExistingProducts(false)
+  }
+
+  const handleDateChange = (date: Date | null) => {
+    if (date) {
+      setExpiryDate(date)
+      // Formatando a data para o formato YYYY-MM-DD para o estado do produto
+      const formattedDate = date.toISOString().split('T')[0]
+      setProduct(prev => ({ ...prev, expiry_date: formattedDate }))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -403,14 +416,14 @@ const ProductForm = () => {
                 <label htmlFor="expiry_date" className="block text-sm font-medium text-gray-700 mb-1">
                   Data de Validade *
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   id="expiry_date"
-                  name="expiry_date"
-                  required
+                  selected={expiryDate}
+                  onChange={handleDateChange}
+                  dateFormat="dd/MM/yyyy"
                   className="w-full p-2 border border-gray-300 rounded-md"
-                  value={product.expiry_date}
-                  onChange={handleChange}
+                  required
+                  minDate={new Date()}
                 />
               </div>
               

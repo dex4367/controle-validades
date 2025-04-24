@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/library'
 import { getProductByBarcode, createProduct, getCategories } from '../services/supabase'
+import DatePicker from 'react-datepicker'
+import "react-datepicker/dist/react-datepicker.css"
 // Importando ícones modernos
 import { 
   FaBarcode, 
@@ -29,7 +31,8 @@ const MobileReceive = () => {
   const [scanning, setScanning] = useState(false)
   const [barcode, setBarcode] = useState('')
   const [productName, setProductName] = useState('')
-  const [expiryDate, setExpiryDate] = useState('')
+  const [expiryDateStr, setExpiryDateStr] = useState('')
+  const [expiryDate, setExpiryDate] = useState<Date>(new Date())
   const [categoryId, setCategoryId] = useState<number>(0)
   const [categories, setCategories] = useState<any[]>([])
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
@@ -145,7 +148,9 @@ const MobileReceive = () => {
       }
       
       // Definir data de validade padrão para hoje
-      setExpiryDate(new Date().toISOString().split('T')[0])
+      const today = new Date();
+      setExpiryDate(today);
+      setExpiryDateStr(today.toISOString().split('T')[0]);
       setStep('form')
     } catch (error) {
       console.error('Erro ao verificar produto:', error)
@@ -173,10 +178,17 @@ const MobileReceive = () => {
     }
   }
 
+  const handleDateChange = (date: Date | null) => {
+    if (date) {
+      setExpiryDate(date);
+      setExpiryDateStr(date.toISOString().split('T')[0]);
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!productName || !expiryDate || !categoryId) {
+    if (!productName || !expiryDateStr || !categoryId) {
       setMessage({
         type: 'error',
         text: 'Preencha todos os campos obrigatórios'
@@ -189,7 +201,7 @@ const MobileReceive = () => {
       
       // Verificar se já existe produto com o mesmo código de barras E mesma data de validade
       const duplicateInList = products.find(
-        p => p.barcode === barcode && p.expiry_date === expiryDate && (editingIndex === null || products.indexOf(p) !== editingIndex)
+        p => p.barcode === barcode && p.expiry_date === expiryDateStr && (editingIndex === null || products.indexOf(p) !== editingIndex)
       )
       
       if (duplicateInList) {
@@ -206,7 +218,7 @@ const MobileReceive = () => {
       //   name: productName,
       //   barcode,
       //   category_id: categoryId,
-      //   expiry_date: expiryDate
+      //   expiry_date: expiryDateStr
       // })
       
       // Adicionar à lista de produtos recebidos
@@ -219,7 +231,7 @@ const MobileReceive = () => {
           name: productName,
           barcode,
           category: category?.name || 'Sem categoria',
-          expiry_date: expiryDate,
+          expiry_date: expiryDateStr,
           category_id: categoryId
         };
         setProducts(updatedProducts);
@@ -232,7 +244,7 @@ const MobileReceive = () => {
             name: productName,
             barcode,
             category: category?.name || 'Sem categoria',
-            expiry_date: expiryDate,
+            expiry_date: expiryDateStr,
             category_id: categoryId
           }
         ]);
@@ -241,7 +253,7 @@ const MobileReceive = () => {
       // Limpar formulário
       setBarcode('')
       setProductName('')
-      setExpiryDate(new Date().toISOString().split('T')[0])
+      setExpiryDateStr('')
       setExistingProduct(null)
       
       setMessage({
@@ -269,20 +281,24 @@ const MobileReceive = () => {
   const resetForm = () => {
     setBarcode('')
     setProductName('')
-    setExpiryDate(new Date().toISOString().split('T')[0])
+    const today = new Date()
+    setExpiryDate(today)
+    setExpiryDateStr(today.toISOString().split('T')[0])
     setExistingProduct(null)
     setMessage(null)
     setStep('scan')
+    setEditingIndex(null)
   }
 
   const handleEditProduct = (index: number) => {
-    const productToEdit = products[index];
-    setBarcode(productToEdit.barcode);
-    setProductName(productToEdit.name);
-    setExpiryDate(productToEdit.expiry_date);
-    setCategoryId(productToEdit.category_id);
-    setEditingIndex(index);
-    setStep('edit');
+    const product = products[index]
+    setBarcode(product.barcode)
+    setProductName(product.name)
+    setCategoryId(product.category_id)
+    setExpiryDateStr(product.expiry_date)
+    setExpiryDate(new Date(product.expiry_date))
+    setEditingIndex(index)
+    setStep('form')
   }
 
   const handleMoveProduct = (index: number, direction: 'up' | 'down') => {
@@ -397,7 +413,12 @@ const MobileReceive = () => {
       setProducts([]);
       setBarcode('');
       setProductName('');
-      setExpiryDate('');
+      
+      // Atualizar os estados de data
+      const today = new Date();
+      setExpiryDate(today);
+      setExpiryDateStr(today.toISOString().split('T')[0]);
+      
       setExistingProduct(null);
       
       let resultMessage = `${addedCount} produto(s) recebido(s) com sucesso!`;
@@ -543,12 +564,13 @@ const MobileReceive = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Validade</label>
-                <input
-                  type="date"
-                  value={expiryDate}
-                  onChange={(e) => setExpiryDate(e.target.value)}
+                <DatePicker
+                  selected={expiryDate}
+                  onChange={handleDateChange}
+                  dateFormat="dd/MM/yyyy"
                   className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
                   required
+                  minDate={new Date()}
                 />
               </div>
 
