@@ -2,8 +2,8 @@
 console.log('🚀 Iniciando build personalizado para Vercel');
 console.log('⏩ Pulando verificação TypeScript e executando diretamente vite build');
 
-// Usando CommonJS pois esse script será executado no Node.js diretamente
-const { execSync } = require('child_process');
+// Usando ES Modules já que package.json tem "type": "module"
+import { execSync } from 'child_process';
 
 try {
   // Executar diretamente o vite build sem passar pelo TypeScript
