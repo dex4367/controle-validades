@@ -5,10 +5,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [
     react({
-      // Desativar checagem de tipos TypeScript
+      // Configuração do Babel para o React
       babel: {
+        presets: [
+          ['@babel/preset-react', { runtime: 'automatic' }],
+          ['@babel/preset-typescript', { isTSX: true, allExtensions: true }]
+        ],
         plugins: [
-          ['@babel/plugin-transform-typescript', { allowNamespaces: true }]
+          ['@babel/plugin-transform-typescript', { allowNamespaces: true, isTSX: true }]
         ]
       }
     })
