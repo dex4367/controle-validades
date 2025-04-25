@@ -16,6 +16,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
   const controlsRef = useRef<IScannerControls | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const scanAttemptsRef = useRef<number>(0);
 
   // Inicializar o scanner quando o componente montar
   useEffect(() => {
@@ -42,7 +43,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
     hints.set(DecodeHintType.ASSUME_GS1, true); // Assume formato GS1 para melhor detecção
     hints.set(DecodeHintType.PURE_BARCODE, false); // Desativa modo de código puro para mais tolerância
     
-    const reader = new BrowserMultiFormatReader(hints, 500); // 500ms de tempo para timeout de decodificação
+    const reader = new BrowserMultiFormatReader(hints, 200); // 200ms de tempo para timeout de decodificação (mais rápido)
     
     // Guardar referência para limpeza posterior
     readerRef.current = reader;
@@ -67,6 +68,34 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
     };
   }, []);
 
+  // Função para lidar com a reinicialização
+  const handleScannerReset = () => {
+    if (readerRef.current) {
+      console.log('🔄 Reiniciando scanner para melhorar detecção...');
+      readerRef.current.reset();
+      scanAttemptsRef.current = 0;
+      setScanAttempts(0);
+      
+      // Adicionar um pequeno atraso antes de reiniciar
+      setTimeout(() => {
+        startScanner();
+      }, 300);
+    }
+  };
+
+  // Monitorar e reiniciar o scanner periodicamente
+  useEffect(() => {
+    if (scanning) {
+      const monitorInterval = setInterval(() => {
+        if (scanAttemptsRef.current > 20) { // Reiniciar após 10 segundos de tentativas
+          handleScannerReset();
+        }
+      }, 500);
+      
+      return () => clearInterval(monitorInterval);
+    }
+  }, [scanning]);
+
   // Função para iniciar o scanner
   const startScanner = async () => {
     if (!readerRef.current || !videoRef.current) {
@@ -79,16 +108,16 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
       setScanning(true);
       setError(null);
       setScanAttempts(0);
+      scanAttemptsRef.current = 0;
       
       // Configuração da câmera com preferência para câmera traseira em dispositivos móveis
-      // Resolução média para melhor performance/capacidade de detecção
+      // Resolução menor para melhor performance/capacidade de detecção
       const constraints = {
         video: {
           facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 },
-          aspectRatio: { ideal: 4/3 } // 4:3
+          width: { ideal: 640 },  // Resolução mais baixa para processamento mais rápido
+          height: { ideal: 480 },
+          frameRate: { ideal: 15 } // Taxa de quadros mais baixa para melhor processamento
         }
       };
       
@@ -126,26 +155,21 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
           
           if (error && !(error instanceof TypeError)) {
             // Incrementar contagem de tentativas para reiniciar o scanner se necessário
+            scanAttemptsRef.current += 1;
             setScanAttempts(prev => prev + 1);
-            console.log('Tentativa de scan:', scanAttempts);
             
-            // Logging detalhado do erro
-            console.warn('Erro durante a leitura:', error.name, error.message);
+            if (scanAttemptsRef.current % 10 === 0) {
+              console.log('Tentativas de scan:', scanAttemptsRef.current);
+            }
+            
+            // Logging detalhado do erro apenas para erros menos frequentes
+            if (scanAttemptsRef.current % 20 === 0) {
+              console.warn('Erro durante a leitura:', error.name, error.message);
+            }
           }
         }
       );
       
-      // Configurar reinicialização periódica do scanner se não detectar códigos por um tempo
-      intervalRef.current = setInterval(() => {
-        if (scanning && scanAttempts > 30) { // Aprox. 15 segundos sem detecção
-          console.log('Reiniciando scanner devido a falta de detecção...');
-          if (readerRef.current) {
-            readerRef.current.reset();
-            setScanAttempts(0);
-            startScanner(); // Reiniciar o scanner
-          }
-        }
-      }, 500);
     } catch (err) {
       console.error('Erro ao iniciar o scanner:', err);
       setError('Não foi possível acessar a câmera. Verifique as permissões do navegador.');
