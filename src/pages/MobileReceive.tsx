@@ -37,7 +37,7 @@ const MobileReceive = () => {
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
   const [existingProduct, setExistingProduct] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<'scan' | 'form' | 'edit' | 'camera'>('scan')
+  const [step, setStep] = useState<'scan' | 'form' | 'edit'>('scan')
   const [products, setProducts] = useState<any[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [isSwapping, setIsSwapping] = useState(false)
@@ -47,6 +47,7 @@ const MobileReceive = () => {
     isAnimating: false,
     direction: 'up'
   })
+  const [isCameraOpen, setIsCameraOpen] = useState(false)
 
   useEffect(() => {
     // Buscar categorias no primeiro carregamento
@@ -124,6 +125,21 @@ const MobileReceive = () => {
         text: 'Digite um código de barras válido'
       })
     }
+  }
+
+  const handleCameraButtonClick = () => {
+    setIsCameraOpen(true)
+  }
+
+  const handleCameraClose = () => {
+    setIsCameraOpen(false)
+  }
+
+  const handleBarcodeDetected = (detectedBarcode: string) => {
+    setBarcode(detectedBarcode)
+    setIsCameraOpen(false)
+    // Executar verificação do produto automaticamente após a detecção
+    checkProduct(detectedBarcode)
   }
 
   const handleDateChange = (date: Date | null) => {
@@ -250,69 +266,55 @@ const MobileReceive = () => {
   }
 
   const handleMoveProduct = (index: number, direction: 'up' | 'down') => {
-    // Não fazer nada se já está animando
-    if (isSwapping) return;
-    
-    // Verificar limites da lista
-    if ((direction === 'up' && index === 0) || 
-        (direction === 'down' && index === products.length - 1)) {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === products.length - 1)) {
       return;
     }
     
-    // Identificar os dois itens que vão trocar de lugar
-    const otherIndex = direction === 'up' ? index - 1 : index + 1;
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
     
-    // Marcar que está começando uma animação
-    setIsSwapping(true);
-    
-    // Iniciar animação
+    // Configura a animação
     setAnimation({
       firstIndex: index,
-      secondIndex: otherIndex,
+      secondIndex: newIndex,
       isAnimating: true,
       direction
     });
     
-    // Aguardar a animação completar antes de trocar os itens
+    setIsSwapping(true);
+    
+    // Executa a troca após um pequeno delay para a animação ter efeito
     setTimeout(() => {
-      const updatedProducts = [...products];
-      [updatedProducts[index], updatedProducts[otherIndex]] = 
-        [updatedProducts[otherIndex], updatedProducts[index]];
+      const newProducts = [...products];
+      const temp = newProducts[index];
+      newProducts[index] = newProducts[newIndex];
+      newProducts[newIndex] = temp;
+      setProducts(newProducts);
       
-      setProducts(updatedProducts);
-      
-      // Finalizar animação
-      setAnimation({
-        firstIndex: -1,
-        secondIndex: -1,
-        isAnimating: false,
-        direction: 'up'
-      });
-      setIsSwapping(false);
-    }, 450); // Tempo apenas para visualizar a animação
+      // Limpa a animação após um curto período
+      setTimeout(() => {
+        setAnimation({
+          firstIndex: -1,
+          secondIndex: -1,
+          isAnimating: false,
+          direction: 'up'
+        });
+        setIsSwapping(false);
+      }, 300);
+    }, 300);
   }
 
-  // Função para determinar a classe CSS com base no estado de animação
   const getAnimationClass = (index: number) => {
-    if (!animation.isAnimating || (index !== animation.firstIndex && index !== animation.secondIndex)) {
-      return '';
+    if (!animation.isAnimating) return '';
+    
+    if (index === animation.firstIndex) {
+      return animation.direction === 'up' ? 'animate-slide-up' : 'animate-slide-down';
     }
     
-    const isFirstItem = index === animation.firstIndex;
-    const isMovingUp = animation.direction === 'up';
-    
-    // Aplicar animação de transição direta
-    if (isFirstItem) {
-      // Item que está sendo movido (clicado)
-      return isMovingUp 
-        ? 'transform -translate-y-full transition-transform duration-450 ease-in-out bg-blue-50' 
-        : 'transform translate-y-full transition-transform duration-450 ease-in-out bg-blue-50';
-    } else {
-      // O outro item envolvido na troca
-      return isMovingUp 
-        ? 'transform translate-y-full transition-transform duration-450 ease-in-out bg-green-50' 
-        : 'transform -translate-y-full transition-transform duration-450 ease-in-out bg-green-50';
+    if (index === animation.secondIndex) {
+      return animation.direction === 'up' ? 'animate-slide-down' : 'animate-slide-up';
     }
+    
+    return '';
   }
 
   const handleFinishReceiving = async () => {
@@ -393,22 +395,8 @@ const MobileReceive = () => {
     }
   }
 
-  const handleBarcodeScan = (barcode: string) => {
-    setBarcode(barcode);
-    checkProduct(barcode);
-  }
-
-  const handleScanError = (error: unknown) => {
-    console.error('Erro no scanner:', error);
-    setMessage({
-      type: 'error',
-      text: 'Erro ao acessar a câmera. Verifique as permissões.'
-    });
-    setStep('scan');
-  }
-
   return (
-    <div className="min-h-screen bg-brmania-light">
+    <div className="min-h-screen bg-gray-100">
       <header className="bg-brmania-green text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold">Cadastrar Produto</h1>
@@ -429,221 +417,219 @@ const MobileReceive = () => {
       </header>
 
       <main className="container mx-auto p-4">
-        {step === 'scan' && (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden p-6">
-            {message && message.type === 'error' && (
-              <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-6">
-                <p className="flex items-center">
-                  <FaTimesCircle className="mr-2" /> {message.text}
-                </p>
-              </div>
-            )}
-            
-            <div className="mb-6">
-              <div className="flex flex-col items-center justify-center bg-brmania-light p-8 rounded-lg mb-6">
-                <FaBarcode className="text-7xl text-brmania-green mb-4" />
-                <p className="text-brmania-dark text-center mb-4">Digite o código de barras manualmente</p>
-                
-                <div className="w-full max-w-md">
-                  <div className="flex mb-4">
+        <div className="max-w-md mx-auto">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Recebimento de Produtos</h2>
+          
+          {step === 'scan' && (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                Escaneie ou digite o código de barras
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="barcode" className="block text-sm font-medium text-gray-700 mb-1">
+                    Código de Barras
+                  </label>
+                  <div className="flex">
                     <input
                       type="text"
+                      id="barcode"
                       value={barcode}
                       onChange={handleBarcodeInput}
-                      className="w-full p-3 border border-brmania-dark/20 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
-                      placeholder="Digite o código de barras"
+                      className="flex-1 p-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Digite ou escaneie o código"
+                      autoFocus
                       onKeyPress={(e) => e.key === 'Enter' && handleManualCheck()}
                     />
                     <button
                       onClick={handleManualCheck}
-                      className="bg-brmania-green text-white p-3 rounded-r-lg"
-                      disabled={loading}
+                      disabled={loading || !barcode.trim()}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700 disabled:bg-blue-300"
                     >
-                      {loading ? <span className="animate-pulse">...</span> : <FaSearch />}
+                      <FaSearch className="text-lg" />
                     </button>
                   </div>
-                  
+                </div>
+                
+                <div className="flex space-x-2">
                   <button
-                    onClick={() => setStep('camera')}
-                    className="w-full bg-brmania-dark text-white p-3 rounded-lg flex items-center justify-center"
+                    onClick={handleCameraButtonClick}
+                    className="flex-1 flex items-center justify-center bg-green-600 text-white p-3 rounded-md hover:bg-green-700"
                   >
-                    <FaCamera className="mr-2" /> Escanear código com a câmera
+                    <FaCamera className="mr-2" />
+                    <span>Usar Câmera</span>
                   </button>
                 </div>
+                
+                {message && (
+                  <div className={`p-3 rounded ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {message.type === 'success' ? <FaCheckCircle className="inline mr-2" /> : <FaTimesCircle className="inline mr-2" />}
+                    {message.text}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        )}
-
-        {step === 'camera' && (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden p-6">
-            <h2 className="text-lg font-semibold text-brmania-dark mb-4 flex items-center">
-              <FaCamera className="mr-2 text-brmania-green" /> Scanner de Código de Barras
-            </h2>
-            
-            <BarcodeScanner 
-              onScan={handleBarcodeScan} 
-              onError={handleScanError} 
-            />
-            
-            <button
-              onClick={() => setStep('scan')}
-              className="w-full mt-4 bg-brmania-dark text-white p-3 rounded-lg"
-            >
-              Voltar para entrada manual
-            </button>
-          </div>
-        )}
-
-        {step === 'form' && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-4">
-            <h2 className="text-lg font-semibold text-brmania-dark mb-4 flex items-center">
-              {editingIndex !== null ? 
-                <><FaEdit className="mr-2 text-brmania-green" /> Editar Produto</> : 
-                <><FaBoxOpen className="mr-2 text-brmania-green" /> Novo Produto</>
-              }
-            </h2>
-
-            {message && (
-              <div className={`p-3 rounded-lg mb-4 ${
-                message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-              }`}>
-                {message.type === 'success' ? 
-                  <FaCheckCircle className="inline mr-2" /> : 
-                  <FaTimesCircle className="inline mr-2" />
+          )}
+          
+          {step === 'form' && (
+            <div className="bg-white rounded-lg shadow-md p-6 mb-4">
+              <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                {editingIndex !== null ? 
+                  <><FaEdit className="mr-2 text-green-600" /> Editar Produto</> : 
+                  <><FaBoxOpen className="mr-2 text-green-600" /> Novo Produto</>
                 }
-                {message.text}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Código de Barras</label>
-                <input
-                  type="text"
-                  value={barcode}
-                  onChange={handleBarcodeInput}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
-                  readOnly={existingProduct !== null}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto</label>
-                <input
-                  type="text"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Data de Validade</label>
-                <DatePicker
-                  selected={expiryDate}
-                  onChange={handleDateChange}
-                  dateFormat="dd/MM/yyyy"
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
-                  required
-                  minDate={new Date()}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(Number(e.target.value))}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
-                  required
-                >
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex space-x-3">
-                <button
-                  type="submit"
-                  className="flex-1 bg-brmania-green text-white py-2 rounded-lg font-medium flex justify-center items-center"
-                  disabled={loading}
-                >
-                  {loading ? 'Processando...' : (
-                    <>
-                      <FaSave className="mr-2" /> 
-                      {editingIndex !== null ? 'Atualizar' : 'Adicionar'}
-                    </>
-                  )}
-                </button>
+              </h2>
+  
+              {message && (
+                <div className={`p-3 rounded-lg mb-4 ${
+                  message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {message.type === 'success' ? 
+                    <FaCheckCircle className="inline mr-2" /> : 
+                    <FaTimesCircle className="inline mr-2" />
+                  }
+                  {message.text}
+                </div>
+              )}
+  
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Código de Barras</label>
+                  <input
+                    type="text"
+                    value={barcode}
+                    onChange={handleBarcodeInput}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    readOnly={existingProduct !== null}
+                  />
+                </div>
                 
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="flex-1 bg-brmania-yellow text-brmania-dark py-2 rounded-lg font-medium flex justify-center items-center"
-                >
-                  <FaBackspace className="mr-2" /> Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {products.length > 0 && step === 'scan' && (
-          <div className="bg-white rounded-lg shadow-md p-6 mt-4">
-            <h2 className="text-lg font-semibold text-brmania-dark mb-4 flex items-center">
-              <FaBoxOpen className="mr-2 text-brmania-green" /> Produtos Recebidos
-            </h2>
-            
-            <ul className="divide-y divide-gray-200">
-              {products.map((product, index) => (
-                <li 
-                  key={`${product.barcode}-${index}`} 
-                  className={`py-3 ${getAnimationClass(index)}`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-brmania-dark">{product.name}</p>
-                      <p className="text-sm text-gray-500">
-                        <span className="inline-block bg-brmania-yellow bg-opacity-30 text-brmania-dark px-2 py-0.5 rounded-full text-xs mr-2">
-                          {product.category}
-                        </span>
-                        Venc: {new Date(product.expiry_date).toLocaleDateString()}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        <FaBarcode className="inline mr-1" /> {product.barcode}
-                      </p>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <button 
-                        onClick={() => handleEditProduct(index)}
-                        className="p-2 rounded-full text-brmania-yellow hover:bg-yellow-100"
-                      >
-                        <FaEdit />
-                      </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto</label>
+                  <input
+                    type="text"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+  
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data de Validade</label>
+                  <DatePicker
+                    selected={expiryDate}
+                    onChange={handleDateChange}
+                    dateFormat="dd/MM/yyyy"
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    minDate={new Date()}
+                  />
+                </div>
+  
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(Number(e.target.value))}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+  
+                <div className="flex space-x-3">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium flex justify-center items-center hover:bg-blue-700"
+                    disabled={loading}
+                  >
+                    {loading ? 'Processando...' : (
+                      <>
+                        <FaSave className="mr-2" /> 
+                        {editingIndex !== null ? 'Atualizar' : 'Adicionar'}
+                      </>
+                    )}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="flex-1 bg-yellow-500 text-white py-2 rounded-lg font-medium flex justify-center items-center hover:bg-yellow-600"
+                  >
+                    <FaBackspace className="mr-2" /> Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+          
+          {products.length > 0 && step === 'scan' && (
+            <div className="bg-white rounded-lg shadow-md p-6 mt-4">
+              <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                <FaBoxOpen className="mr-2 text-green-600" /> Produtos Recebidos ({products.length})
+              </h2>
+              
+              <ul className="divide-y divide-gray-200">
+                {products.map((product, index) => (
+                  <li 
+                    key={`${product.barcode}-${index}`} 
+                    className={`py-3 ${getAnimationClass(index)}`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium text-gray-800">{product.name}</p>
+                        <p className="text-sm text-gray-500">
+                          <span className="inline-block bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full text-xs mr-2">
+                            {product.category}
+                          </span>
+                          Venc: {new Date(product.expiry_date).toLocaleDateString()}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          <FaBarcode className="inline mr-1" /> {product.barcode}
+                        </p>
+                      </div>
                       
-                      <button 
-                        onClick={() => {
-                          const updatedProducts = [...products];
-                          updatedProducts.splice(index, 1);
-                          setProducts(updatedProducts);
-                        }}
-                        className="p-2 rounded-full text-red-500 hover:bg-red-100"
-                      >
-                        <FaTrash />
-                      </button>
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => handleEditProduct(index)}
+                          className="p-2 rounded-full text-yellow-500 hover:bg-yellow-100"
+                        >
+                          <FaEdit />
+                        </button>
+                        
+                        <button 
+                          onClick={() => {
+                            const updatedProducts = [...products];
+                            updatedProducts.splice(index, 1);
+                            setProducts(updatedProducts);
+                          }}
+                          className="p-2 rounded-full text-red-500 hover:bg-red-100"
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {/* Scanner de código de barras com câmera */}
+          {isCameraOpen && (
+            <BarcodeScanner 
+              onBarcodeDetected={handleBarcodeDetected}
+              onClose={handleCameraClose}
+            />
+          )}
+        </div>
       </main>
     </div>
   )

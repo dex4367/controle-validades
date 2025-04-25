@@ -1,212 +1,133 @@
-import React, { useState, useEffect } from 'react';
-import { useZxing } from 'react-zxing';
+import { useEffect, useRef, useState } from 'react';
+import Webcam from 'react-webcam';
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 
 interface BarcodeScannerProps {
-  onScan?: (barcode: string) => void;
-  onError?: (error: unknown) => void;
+  onBarcodeDetected: (barcode: string) => void;
+  onClose: () => void;
 }
 
-const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onError }) => {
-  const [result, setResult] = useState('');
-  const [isActive, setIsActive] = useState(true);
-  const [constraints, setConstraints] = useState({
-    video: {
-      facingMode: 'environment',
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-    }
-  });
+const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => {
+  const webcamRef = useRef<Webcam>(null);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Configuração avançada para o leitor de código de barras
-  const { ref } = useZxing({
-    onDecodeResult(decodedResult) {
-      const text = decodedResult.getText();
-      setResult(text);
-      onScan && onScan(text);
-      // Pausa a câmera por um momento após um scan bem-sucedido
-      setIsActive(false);
-      setTimeout(() => setIsActive(true), 1500);
-    },
-    onError(error) {
-      console.error("Erro de escaneamento:", error);
-      onError && onError(error);
-    },
-    paused: !isActive,
-    constraints: constraints,
-    timeBetweenDecodingAttempts: 300
-  });
+  useEffect(() => {
+    // Configurações para o leitor de código de barras
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODE_128,
+    ]);
 
-  // Alterna entre câmeras frontal e traseira
-  const toggleCamera = () => {
-    setConstraints({
-      video: {
-        facingMode: constraints.video.facingMode === 'environment' ? 'user' : 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+    const codeReader = new BrowserMultiFormatReader(hints);
+    let stopScanning = false;
+
+    const scanBarcode = async () => {
+      if (stopScanning || !webcamRef.current || !isCameraReady) return;
+
+      try {
+        const imageSrc = webcamRef.current.getScreenshot();
+        
+        if (imageSrc) {
+          try {
+            // Criar uma imagem a partir do screenshot
+            const image = new Image();
+            image.src = imageSrc;
+            
+            // Aguardar até que a imagem carregue
+            await new Promise((resolve) => {
+              image.onload = resolve;
+            });
+            
+            // Tentar decodificar o código de barras a partir da imagem
+            const result = await codeReader.decodeFromImage(image);
+            
+            if (result && result.getText()) {
+              onBarcodeDetected(result.getText());
+              stopScanning = true;
+              return;
+            }
+          } catch (error) {
+            // Ignorar erros de decodificação e continuar escaneando
+          }
+        }
+        
+        // Continuar o loop de escaneamento
+        if (!stopScanning) {
+          requestAnimationFrame(scanBarcode);
+        }
+      } catch (error) {
+        console.error('Erro ao escanear código de barras:', error);
+        requestAnimationFrame(scanBarcode);
       }
-    });
+    };
+
+    if (isCameraReady) {
+      scanBarcode();
+    }
+
+    return () => {
+      stopScanning = true;
+      codeReader.reset();
+    };
+  }, [isCameraReady, onBarcodeDetected]);
+
+  const handleUserMedia = () => {
+    setIsCameraReady(true);
+    setError(null);
+  };
+
+  const handleUserMediaError = (error: string | DOMException) => {
+    console.error('Erro ao acessar a câmera:', error);
+    setError('Não foi possível acessar a câmera. Verifique as permissões.');
+    setIsCameraReady(false);
   };
 
   return (
-    <div className="barcode-scanner-container">
-      <div className="scanner-view">
-        {isActive ? (
-          <>
-            <div className="viewfinder">
-              <div className="corner top-left"></div>
-              <div className="corner top-right"></div>
-              <div className="corner bottom-left"></div>
-              <div className="corner bottom-right"></div>
-              <div className="scan-line"></div>
-            </div>
-            {/* @ts-ignore */}
-            <video ref={ref} className="camera-view" />
-            <button className="camera-switch" onClick={toggleCamera}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-                <path fill="white" d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5V16l-5-5 5-5v2.5h4v7h-4z"/>
-              </svg>
-            </button>
-          </>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
+      <div className="bg-white p-4 rounded-lg shadow-lg max-w-md w-full">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Escanear Código de Barras</h3>
+          <button 
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            Fechar
+          </button>
+        </div>
+
+        {error ? (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
         ) : (
-          <div className="scanner-success">
-            <div className="success-message">
-              <span>Código Escaneado!</span>
-              <p>{result}</p>
+          <div className="relative">
+            <Webcam
+              ref={webcamRef}
+              audio={false}
+              screenshotFormat="image/jpeg"
+              videoConstraints={{
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              }}
+              onUserMedia={handleUserMedia}
+              onUserMediaError={handleUserMediaError}
+              className="w-full rounded"
+            />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="border-2 border-red-500 w-64 h-32 opacity-70"></div>
             </div>
           </div>
         )}
+
+        <div className="mt-4 text-center text-sm text-gray-600">
+          Posicione o código de barras dentro da área demarcada
+        </div>
       </div>
-      
-      <style>
-        {`
-        .barcode-scanner-container {
-          width: 100%;
-          max-width: 500px;
-          margin: 0 auto;
-        }
-        .scanner-view {
-          position: relative;
-          width: 100%;
-          height: 300px;
-          overflow: hidden;
-          border-radius: 12px;
-          background-color: #000;
-        }
-        .camera-view {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .viewfinder {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          z-index: 10;
-          pointer-events: none;
-        }
-        .corner {
-          position: absolute;
-          width: 20px;
-          height: 20px;
-          border-color: #ffffff;
-          border-style: solid;
-        }
-        .top-left {
-          top: 60px;
-          left: 40px;
-          border-width: 4px 0 0 4px;
-          border-top-left-radius: 8px;
-        }
-        .top-right {
-          top: 60px;
-          right: 40px;
-          border-width: 4px 4px 0 0;
-          border-top-right-radius: 8px;
-        }
-        .bottom-left {
-          bottom: 160px;
-          left: 40px;
-          border-width: 0 0 4px 4px;
-          border-bottom-left-radius: 8px;
-        }
-        .bottom-right {
-          bottom: 160px;
-          right: 40px;
-          border-width: 0 4px 4px 0;
-          border-bottom-right-radius: 8px;
-        }
-        .scan-line {
-          position: absolute;
-          width: calc(100% - 80px);
-          height: 2px;
-          background-color: rgba(255, 0, 0, 0.8);
-          left: 40px;
-          top: 50%;
-          transform: translateY(-50%);
-          animation: scanAnimation 1.5s infinite ease-in-out;
-          box-shadow: 0 0 8px rgba(255, 0, 0, 0.7);
-        }
-        @keyframes scanAnimation {
-          0% {
-            top: 65px;
-          }
-          50% {
-            top: calc(100% - 165px);
-          }
-          100% {
-            top: 65px;
-          }
-        }
-        .scanner-success {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-          height: 100%;
-          background-color: rgba(0, 0, 0, 0.8);
-        }
-        .success-message {
-          text-align: center;
-          color: white;
-          padding: 20px;
-          border-radius: 8px;
-          background-color: rgba(200, 0, 0, 0.3);
-          width: 80%;
-          max-width: 300px;
-        }
-        .success-message span {
-          font-size: 20px;
-          font-weight: bold;
-          margin-bottom: 10px;
-          display: block;
-        }
-        .success-message p {
-          font-size: 18px;
-          word-break: break-all;
-          margin: 10px 0 0;
-        }
-        .camera-switch {
-          position: absolute;
-          bottom: 15px;
-          right: 15px;
-          width: 45px;
-          height: 45px;
-          border-radius: 50%;
-          background-color: rgba(0, 0, 0, 0.5);
-          border: 2px solid rgba(255, 255, 255, 0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          z-index: 20;
-        }
-        .camera-switch:hover {
-          background-color: rgba(0, 0, 0, 0.7);
-        }
-        `}
-      </style>
     </div>
   );
 };
