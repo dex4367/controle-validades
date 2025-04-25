@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getProductsByBarcode } from '../services/supabase'
+import CameraBarcodeScanner from './CameraBarcodeScanner'
 
 const BarcodeScanner = () => {
   const navigate = useNavigate()
@@ -9,6 +10,7 @@ const BarcodeScanner = () => {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [focusInput, setFocusInput] = useState(true)
+  const [showCameraScanner, setShowCameraScanner] = useState(false)
 
   // Manter o foco no input para facilitar o uso do leitor de código de barras
   useEffect(() => {
@@ -147,6 +149,23 @@ const BarcodeScanner = () => {
     navigate(`/products/edit/${productId}`)
   }
 
+  // Nova função para lidar com o código de barras detectado pela câmera
+  const handleBarcodeDetected = (detectedBarcode: string) => {
+    setShowCameraScanner(false)
+    setBarcode(detectedBarcode)
+    fetchProducts(detectedBarcode)
+  }
+
+  // Nova função para abrir o scanner de câmera
+  const handleOpenCameraScanner = () => {
+    setShowCameraScanner(true)
+  }
+
+  // Renderização condicional baseada no estado do scanner de câmera
+  if (showCameraScanner) {
+    return <CameraBarcodeScanner onDetect={handleBarcodeDetected} />
+  }
+
   return (
     <div className="max-w-3xl mx-auto">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Leitor de Código de Barras</h2>
@@ -176,9 +195,20 @@ const BarcodeScanner = () => {
               Buscar
             </button>
           </div>
-          <p className="mt-1 text-sm text-gray-500">
-            Conecte seu leitor de código de barras USB, clique no campo acima e faça a leitura
-          </p>
+          <div className="flex justify-between items-center mt-2">
+            <p className="text-sm text-gray-500">
+              Conecte seu leitor de código de barras USB, clique no campo acima e faça a leitura
+            </p>
+            <button 
+              onClick={handleOpenCameraScanner}
+              className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 text-sm flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+              </svg>
+              Usar Câmera
+            </button>
+          </div>
         </div>
 
         {/* Mensagem de carregamento */}
@@ -289,6 +319,7 @@ const BarcodeScanner = () => {
               <li>Clique no campo de texto acima para deixá-lo ativo</li>
               <li>Escaneie o código de barras do produto</li>
               <li>Caso tenha um leitor, você também pode digitar o código manualmente</li>
+              <li>Ou clique no botão "Usar Câmera" para escanear com a câmera do dispositivo</li>
               <li>Se o produto existir, serão exibidas suas informações</li>
               <li>Se não existir, você terá a opção de cadastrá-lo</li>
             </ol>

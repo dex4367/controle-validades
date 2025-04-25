@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
-import { FaTimes, FaBolt } from 'react-icons/fa';
+import { FaTimes } from 'react-icons/fa';
 
 interface BarcodeScannerProps {
   onBarcodeDetected: (barcode: string) => void;
@@ -166,11 +166,12 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden w-full max-w-sm mx-4">
-        <div className="flex justify-between items-center p-1 bg-blue-600 text-white">
-          <h3 className="text-xs font-medium px-1">Scanner Otimizado</h3>
+        {/* Cabeçalho no estilo BR Mania */}
+        <div className="flex justify-between items-center p-2 bg-red-600 text-white">
+          <h3 className="text-sm font-medium px-1">Scanner BR Mania</h3>
           <button 
             onClick={onClose}
-            className="text-white p-1"
+            className="text-white p-1 rounded-full hover:bg-red-700"
             aria-label="Fechar"
           >
             <FaTimes size={14} />
@@ -197,25 +198,39 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
               }}
               onUserMedia={handleUserMedia}
               onUserMediaError={handleUserMediaError}
-              className="w-full h-48 object-cover"
+              className="w-full h-64 object-cover"
               mirrored={false}
             />
             
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="bg-black bg-opacity-50 px-2 py-0.5 rounded-full flex items-center animate-pulse">
-                <FaBolt className="text-yellow-400 mr-1" size={12} />
+            {/* Retângulo de escaneamento */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="relative w-64 h-32 border-2 border-yellow-400 rounded-lg overflow-hidden">
+                {/* Cantos do retângulo */}
+                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-red-600 -mt-0.5 -ml-0.5"></div>
+                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-red-600 -mt-0.5 -mr-0.5"></div>
+                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-red-600 -mb-0.5 -ml-0.5"></div>
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-red-600 -mb-0.5 -mr-0.5"></div>
+                
+                {/* Linha de escaneamento vermelha animada */}
+                <div className="absolute left-0 w-full h-0.5 bg-red-600 animate-scan-line"></div>
+              </div>
+            </div>
+            
+            {/* Texto de instruções */}
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+              <div className="bg-black bg-opacity-70 px-3 py-1 rounded-full">
                 <p className="text-white text-xs">
-                  Posicione o código de barras
+                  Posicione o código no retângulo
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        <div className="p-0.5 bg-gray-50 flex justify-center">
+        <div className="p-1 bg-yellow-50 flex justify-center">
           <button 
             onClick={onClose}
-            className="bg-gray-200 text-gray-800 px-2 py-0.5 rounded text-xs"
+            className="bg-red-600 text-white px-4 py-1 rounded text-xs font-medium hover:bg-red-700"
           >
             Cancelar
           </button>
