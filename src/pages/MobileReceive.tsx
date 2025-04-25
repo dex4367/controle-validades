@@ -818,11 +818,43 @@ const MobileReceive = () => {
                         >
                           <FaTrash />
                         </button>
+
+                        {/* Botões de ordem restaurados */}
+                        {index > 0 && (
+                          <button 
+                            onClick={() => !isSwapping && handleMoveProduct(index, 'up')}
+                            disabled={isSwapping}
+                            className="p-2 rounded-full text-blue-500 hover:bg-blue-100 disabled:opacity-50"
+                          >
+                            <FaArrowUp />
+                          </button>
+                        )}
+                        
+                        {index < products.length - 1 && (
+                          <button 
+                            onClick={() => !isSwapping && handleMoveProduct(index, 'down')}
+                            disabled={isSwapping}
+                            className="p-2 rounded-full text-blue-500 hover:bg-blue-100 disabled:opacity-50"
+                          >
+                            <FaArrowDown />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </li>
                 ))}
               </ul>
+              
+              {/* Botão de finalizar recebimento restaurado */}
+              <div className="mt-4">
+                <button
+                  onClick={handleFinishReceiving}
+                  className="w-full bg-brmania-green text-white py-3 rounded-lg font-medium flex justify-center items-center hover:bg-green-700"
+                  disabled={loading}
+                >
+                  {loading ? 'Processando...' : 'Finalizar Recebimento'}
+                </button>
+              </div>
             </div>
           )}
           
