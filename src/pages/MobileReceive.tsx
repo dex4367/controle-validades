@@ -63,6 +63,11 @@ const MobileReceive = () => {
     // Buscar categorias no primeiro carregamento
     loadCategories()
 
+    // Iniciar o scanner automaticamente após carregar as categorias
+    setTimeout(() => {
+      startScan();
+    }, 1000);
+
     // Limpar ao desmontar
     return () => {
       if (codeReader.current) {
