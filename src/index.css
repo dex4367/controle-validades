@@ -23,23 +23,18 @@ body {
   color: var(--brmania-dark);
 }
 
-@keyframes scanner-line {
+@keyframes scan {
   0% {
     top: 0;
-    opacity: 0;
   }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
+  50% {
+    top: 100%;
   }
   100% {
-    top: 100%;
-    opacity: 0;
+    top: 0;
   }
 }
 
-.animate-scanner-line {
-  animation: scanner-line 2s infinite;
+.animate-scan-line {
+  animation: scan 1.5s linear infinite;
 } 

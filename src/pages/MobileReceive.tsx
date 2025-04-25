@@ -143,59 +143,48 @@ const MobileReceive = () => {
   const handleExpiryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
     
-    // Se o usuário colocar as barras, mantém
-    if (value.includes('/')) {
-      // Apenas garantimos que não existam caracteres não numéricos exceto barras
-      value = value.replace(/[^\d\/]/g, '');
-      setExpiryDateStr(value);
-    } else {
-      // Remove qualquer caractere que não seja número
-      value = value.replace(/[^\d]/g, '');
+    // Remove caracteres não numéricos, exceto barras
+    value = value.replace(/[^\d\/]/g, '');
+    
+    // Formatação automática com duas barras
+    if (value.length > 0) {
+      // Remove barras existentes primeiro para evitar duplicação
+      const digitsOnly = value.replace(/\//g, '');
       
-      // Formata com barras conforme o usuário digita
-      if (value.length <= 2) {
+      // Aplica novamente a formatação
+      if (digitsOnly.length <= 2) {
         // Apenas dia
-        setExpiryDateStr(value);
-      } else if (value.length <= 4) {
-        // Dia e mês
-        setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2)}`);
-      } else if (value.length <= 6) {
-        // Dia, mês e ano
-        setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`);
+        value = digitsOnly;
+      } else if (digitsOnly.length <= 4) {
+        // Dia e mês - 1234 -> 12/34
+        value = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}`;
       } else {
-        // Limita a 6 dígitos (dd/mm/aa)
-        setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4, 6)}`);
+        // Dia, mês e ano - 123456 -> 12/34/56
+        value = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}/${digitsOnly.slice(4, 6)}`;
       }
     }
     
-    // Atualiza o estado da data
-    try {
-      // Extrai os componentes da data (com ou sem barras)
-      let day, month, year;
-      
-      if (value.includes('/')) {
-        const parts = value.split('/');
-        day = parseInt(parts[0] || '0');
-        month = parseInt(parts[1] || '0') - 1;  // Mês em JS é 0-indexado
-        year = parts[2] ? parseInt(`20${parts[2]}`) : 0;
-      } else if (value.length >= 6) {
-        day = parseInt(value.slice(0, 2));
-        month = parseInt(value.slice(2, 4)) - 1;
-        year = parseInt(`20${value.slice(4, 6)}`);
-      } else {
-        return; // Data incompleta, não atualiza o objeto Date
-      }
-      
-      if (day > 0 && month >= 0 && year > 0) {
+    // Atualizar o valor no campo
+    setExpiryDateStr(value);
+    
+    // Extrair componentes para atualizar o objeto Date
+    const digitsOnly = value.replace(/\//g, '');
+    
+    if (digitsOnly.length >= 6) {
+      try {
+        const day = parseInt(digitsOnly.slice(0, 2));
+        const month = parseInt(digitsOnly.slice(2, 4)) - 1; // Mês em JS é 0-indexado
+        const year = parseInt(`20${digitsOnly.slice(4, 6)}`); // Assume anos 2000
+        
         const dateObj = new Date(year, month, day);
         
         // Verifica se é uma data válida
         if (!isNaN(dateObj.getTime())) {
           setExpiryDate(dateObj);
         }
+      } catch (error) {
+        console.error('Erro ao converter data:', error);
       }
-    } catch (error) {
-      console.error('Erro ao converter data:', error);
     }
   };
 
@@ -628,26 +617,38 @@ const MobileReceive = () => {
                         // Permitir colar data e formatá-la automaticamente
                         e.preventDefault();
                         const pastedText = e.clipboardData.getData('text');
-                        // Remove caracteres não numéricos e aplica formatação
+                        // Remove caracteres não numéricos
                         const numbers = pastedText.replace(/[^\d]/g, '');
                         
-                        if (numbers.length >= 6) {
-                          const day = numbers.slice(0, 2);
-                          const month = numbers.slice(2, 4);
-                          const year = numbers.slice(4, 6);
-                          setExpiryDateStr(`${day}/${month}/${year}`);
+                        if (numbers.length > 0) {
+                          // Remove barras existentes primeiro para evitar duplicação
+                          const digitsOnly = numbers.replace(/\//g, '');
                           
-                          // Atualiza o objeto de data
-                          try {
-                            const dateObj = new Date(parseInt(`20${year}`), parseInt(month) - 1, parseInt(day));
-                            if (!isNaN(dateObj.getTime())) {
-                              setExpiryDate(dateObj);
+                          // Aplica formatação baseada no tamanho
+                          if (digitsOnly.length <= 2) {
+                            // Apenas dia
+                            setExpiryDateStr(digitsOnly);
+                          } else if (digitsOnly.length <= 4) {
+                            // Dia e mês - 1234 -> 12/34
+                            setExpiryDateStr(`${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}`);
+                          } else {
+                            // Dia, mês e ano - 123456 -> 12/34/56
+                            setExpiryDateStr(`${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}/${digitsOnly.slice(4, 6)}`);
+                            
+                            // Atualiza o objeto de data
+                            try {
+                              const day = parseInt(digitsOnly.slice(0, 2));
+                              const month = parseInt(digitsOnly.slice(2, 4)) - 1;
+                              const year = parseInt(`20${digitsOnly.slice(4, 6)}`);
+                              const dateObj = new Date(year, month, day);
+                              
+                              if (!isNaN(dateObj.getTime())) {
+                                setExpiryDate(dateObj);
+                              }
+                            } catch (error) {
+                              console.error('Erro ao converter data colada:', error);
                             }
-                          } catch (error) {
-                            console.error('Erro ao converter data colada:', error);
                           }
-                        } else {
-                          setExpiryDateStr(numbers);
                         }
                       }}
                       placeholder="DD/MM/AA"
