@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader, Result, BarcodeFormat } from '@zxing/library';
 import { IScannerControls } from '@zxing/browser';
 
-const BarcodeScanner: React.FC = () => {
+interface BarcodeScannerProps {
+  onBarcodeDetected?: (barcode: string) => void;
+}
+
+const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) => {
   const [barcode, setBarcode] = useState<string>('');
   const [scanning, setScanning] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +74,11 @@ const BarcodeScanner: React.FC = () => {
             const scannedBarcode = result.getText();
             console.log('Código detectado:', scannedBarcode);
             setBarcode(scannedBarcode);
+            
+            // Notificar o componente pai se o callback existir
+            if (onBarcodeDetected) {
+              onBarcodeDetected(scannedBarcode);
+            }
             
             // Parar o scanner após o primeiro código ser lido
             stopScanner();
