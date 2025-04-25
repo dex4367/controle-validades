@@ -6,150 +6,126 @@ interface BarcodeScannerProps {
 }
 
 const BarcodeScanner = ({ onBarcodeDetected }: BarcodeScannerProps) => {
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [scanning, setScanning] = useState<boolean>(false);
-  const [lastDetection, setLastDetection] = useState<string | null>(null);
+  const [detectedCode, setDetectedCode] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
-  const scannerActive = useRef<boolean>(false);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Inicializar o scanner quando o componente montar
+  // Configurar e iniciar o scanner quando o componente montar
   useEffect(() => {
-    console.log('🚀 Inicializando scanner...');
+    startScanning();
     
-    // Configurar o leitor de código de barras com configurações básicas
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.CODE_128
-    ]);
-    
-    hints.set(DecodeHintType.TRY_HARDER, true);
-    
-    const reader = new BrowserMultiFormatReader(hints, 150); // Timeout curto para detectar rapidamente
-    readerRef.current = reader;
-    
-    // Iniciar o scanner com um pequeno atraso
-    setTimeout(() => {
-      startScanner();
-    }, 500);
-    
-    // Limpar recursos
+    // Limpar recursos quando o componente desmontar
     return () => {
-      console.log('Limpando recursos do scanner');
-      scannerActive.current = false;
-      if (readerRef.current) {
-        readerRef.current.reset();
-      }
+      stopScanning();
     };
   }, []);
   
-  // Iniciar o scanner
-  const startScanner = async () => {
-    if (!readerRef.current || !videoRef.current) return;
-    
+  const startScanning = async () => {
     try {
-      console.log('📷 Iniciando câmera...');
-      setScanning(true);
       setError(null);
-      scannerActive.current = true;
+      setScanning(true);
       
-      // Configurações de vídeo simplificadas
-      const constraints = {
+      // Obter acesso à câmera
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
-          facingMode: 'environment',
-          width: 640,
-          height: 480
+          facingMode: 'environment', 
+          width: { ideal: 640 },
+          height: { ideal: 480 }
         }
-      };
+      });
       
-      // Monitoramento contínuo de código de barras
-      const handleDecoding = async () => {
-        if (!scannerActive.current || !readerRef.current || !videoRef.current) return;
-        
-        try {
-          // Tentar detectar um código uma vez
-          const result = await readerRef.current.decodeFromVideoElement(videoRef.current);
-          
-          if (result) {
-            const scannedCode = result.getText();
-            console.log('✅ Código detectado:', scannedCode);
-            
-            // Reproduzir som de beep
-            try {
-              const beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...');
-              beep.volume = 0.5;
-              beep.play();
-            } catch (e) {
-              console.log('Erro ao reproduzir beep');
-            }
-            
-            // Notificar o código detectado
-            setLastDetection(scannedCode);
-            onBarcodeDetected(scannedCode);
-            
-            // Parar o scanner após o primeiro código ser lido
-            stopScanner();
-            return;
+      // Armazenar a stream para poder limpar depois
+      streamRef.current = stream;
+      
+      // Conectar o stream de vídeo ao elemento <video>
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+      
+      // Criar um leitor de código de barras com configurações básicas
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.CODE_128
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      
+      const reader = new BrowserMultiFormatReader(hints);
+      
+      // Iniciar verificação periódica para detecção de código de barras
+      scanIntervalRef.current = setInterval(() => {
+        if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+          try {
+            // Tentar decodificar código de barras do frame atual
+            reader.decodeFromVideoElement(videoRef.current)
+              .then(result => {
+                if (result) {
+                  const code = result.getText();
+                  console.log("✅ Código detectado:", code);
+                  
+                  // Evitar detecções repetidas do mesmo código
+                  if (code !== detectedCode) {
+                    setDetectedCode(code);
+                    onBarcodeDetected(code);
+                    
+                    // Reproduzir som de beep
+                    const audio = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...');
+                    audio.volume = 0.5;
+                    audio.play().catch(e => console.log('Erro ao reproduzir som'));
+                    
+                    // Parar o scanner após detectar o código
+                    stopScanning();
+                  }
+                }
+              })
+              .catch(err => {
+                // Ignorar erros de decodificação - é normal quando não há código visível
+              });
+          } catch (error) {
+            // Ignorar erros temporários durante a detecção
           }
-        } catch (error) {
-          // Ignorar erros de detecção - é normal ocorrerem quando não há código visível
-          if (scannerActive.current) {
-            // Continuar tentando se o scanner ainda estiver ativo
-            setTimeout(handleDecoding, 100);
-          }
         }
-        
-        // Continuar o loop de detecção
-        if (scannerActive.current) {
-          setTimeout(handleDecoding, 100);
-        }
-      };
-      
-      // Iniciar o fluxo de vídeo antes de começar a decodificação
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      videoRef.current.srcObject = stream;
-      
-      // Garantir que o vídeo esteja funcionando antes de começar a detectar
-      videoRef.current.onloadedmetadata = () => {
-        if (videoRef.current) {
-          videoRef.current.play();
-          console.log('▶️ Vídeo iniciado, começando detecção...');
-          // Iniciar o loop de detecção
-          handleDecoding();
-        }
-      };
+      }, 200); // Verificar a cada 200ms
       
     } catch (err) {
-      console.error('❌ Erro ao acessar câmera:', err);
-      setError('Não foi possível acessar a câmera. Verifique as permissões do navegador.');
+      console.error("❌ Erro ao acessar câmera:", err);
+      setError("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
       setScanning(false);
-      scannerActive.current = false;
     }
   };
   
-  // Parar o scanner
-  const stopScanner = () => {
-    console.log('⏹️ Parando scanner');
-    scannerActive.current = false;
+  const stopScanning = () => {
     setScanning(false);
     
-    // Parar a stream de vídeo
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      const tracks = stream.getTracks();
+    // Limpar o intervalo de verificação
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    
+    // Parar a stream da câmera
+    if (streamRef.current) {
+      const tracks = streamRef.current.getTracks();
       tracks.forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    // Limpar o video
+    if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
   };
   
-  // Reiniciar o scanner
   const resetScanner = () => {
-    setLastDetection(null);
-    startScanner();
+    setDetectedCode(null);
+    startScanning();
   };
   
   return (
@@ -205,7 +181,7 @@ const BarcodeScanner = ({ onBarcodeDetected }: BarcodeScannerProps) => {
       )}
       
       {/* Status do scanner */}
-      {scanning && !error && !lastDetection && (
+      {scanning && !error && !detectedCode && (
         <div className="w-full bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
           <p className="flex items-center justify-center">
             <span className="inline-block w-4 h-4 mr-2 bg-blue-600 rounded-full animate-pulse"></span>
@@ -215,17 +191,17 @@ const BarcodeScanner = ({ onBarcodeDetected }: BarcodeScannerProps) => {
       )}
       
       {/* Exibir código lido */}
-      {lastDetection && (
+      {detectedCode && (
         <div className="w-full bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
           <p className="font-semibold">Código lido:</p>
-          <p className="text-lg font-mono">{lastDetection}</p>
+          <p className="text-lg font-mono">{detectedCode}</p>
         </div>
       )}
       
       {/* Botões de controle */}
       <div className="flex gap-2 w-full">
         <button
-          onClick={stopScanner}
+          onClick={stopScanning}
           disabled={!scanning}
           className={`flex-1 py-2 px-4 rounded-lg ${scanning 
             ? 'bg-red-500 text-white hover:bg-red-600' 
@@ -236,12 +212,12 @@ const BarcodeScanner = ({ onBarcodeDetected }: BarcodeScannerProps) => {
         
         <button
           onClick={resetScanner}
-          disabled={scanning && !lastDetection}
-          className={`flex-1 py-2 px-4 rounded-lg ${!scanning || lastDetection
+          disabled={scanning && !detectedCode}
+          className={`flex-1 py-2 px-4 rounded-lg ${!scanning || detectedCode
             ? 'bg-[#009A3D] text-white hover:bg-[#008A35]' 
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
         >
-          {lastDetection ? 'Escanear Novamente' : 'Iniciar Scanner'}
+          {detectedCode ? 'Escanear Novamente' : 'Iniciar Scanner'}
         </button>
       </div>
     </div>
