@@ -10,47 +10,56 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
   const [barcode, setBarcode] = useState<string>('');
   const [scanning, setScanning] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanAttempts, setScanAttempts] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Inicializar o scanner quando o componente montar
   useEffect(() => {
+    console.log('Inicializando scanner...');
+    
     // Criar uma instância do leitor de código de barras com configurações otimizadas
     const hints = new Map();
     
-    // Configurar todos os formatos relevantes de código de barras
+    // Priorizar formatos de código de barras comuns em produtos - EAN/UPC são os mais comuns
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.CODE_128,
+      BarcodeFormat.EAN_13, // Formato mais comum em produtos comerciais
+      BarcodeFormat.UPC_A,  // Comum em produtos dos EUA
+      BarcodeFormat.EAN_8,  // Versão curta do EAN para produtos pequenos
+      BarcodeFormat.UPC_E,  // Versão curta do UPC 
+      BarcodeFormat.CODE_128, // Formato industrial comum
+      BarcodeFormat.CODE_39, // Formato industrial mais antigo
       BarcodeFormat.CODE_93,
       BarcodeFormat.DATA_MATRIX,
       BarcodeFormat.QR_CODE
     ]);
     
-    // Tentar várias vezes antes de falhar
-    hints.set(DecodeHintType.TRY_HARDER, true);
+    // Configurações para aumentar a sensibilidade
+    hints.set(DecodeHintType.TRY_HARDER, true); // Máximo esforço para decodificar
+    hints.set(DecodeHintType.ASSUME_GS1, true); // Assume formato GS1 para melhor detecção
+    hints.set(DecodeHintType.PURE_BARCODE, false); // Desativa modo de código puro para mais tolerância
     
-    // Tolerância para códigos danificados
-    hints.set(DecodeHintType.PURE_BARCODE, false);
-    
-    const reader = new BrowserMultiFormatReader(hints);
+    const reader = new BrowserMultiFormatReader(hints, 500); // 500ms de tempo para timeout de decodificação
     
     // Guardar referência para limpeza posterior
     readerRef.current = reader;
     
     // Iniciar o scanner automaticamente após um breve atraso para permitir carregamento
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      console.log('Iniciando scanner após delay...');
       startScanner();
     }, 1000);
     
     // Limpar recursos quando o componente desmontar
     return () => {
+      console.log('Limpando recursos do scanner...');
+      clearTimeout(timer);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
       stopScanner();
       if (readerRef.current) {
         readerRef.current.reset();
@@ -60,20 +69,25 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
 
   // Função para iniciar o scanner
   const startScanner = async () => {
-    if (!readerRef.current || !videoRef.current) return;
+    if (!readerRef.current || !videoRef.current) {
+      console.error('Referências não disponíveis para iniciar scanner');
+      return;
+    }
     
     try {
+      console.log('Iniciando scanner e solicitando acesso à câmera...');
       setScanning(true);
       setError(null);
+      setScanAttempts(0);
       
       // Configuração da câmera com preferência para câmera traseira em dispositivos móveis
-      // e configurações otimizadas para melhorar a leitura
+      // Resolução média para melhor performance/capacidade de detecção
       const constraints = {
         video: {
           facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 60 },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
           aspectRatio: { ideal: 4/3 } // 4:3
         }
       };
@@ -86,16 +100,19 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
           if (result) {
             // Código de barras detectado
             const scannedBarcode = result.getText();
-            console.log('Código detectado:', scannedBarcode);
+            console.log('🎉 Código detectado:', scannedBarcode);
             setBarcode(scannedBarcode);
             
             // Reproduzir som de bipe quando detectar um código
-            const beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...');
-            beep.volume = 0.3;
             try {
+              // Som de beep em base64 diretamente no código
+              const beepSound = 'data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA//////////////////////////////////////////////////////////////////8AAAAeTEFNRTMuMTAwA8MAAAAAAAAAABQgJAUHQQAB9AAAAnGIf8KhAAAAAAAAAAAAAAAAAAAA//vQxAADwAABpAAAACAAADSAAAAEaXBob25lIHNvdW5kIGNyZWF0ZWQgYnkgQ2FybG9zIFZpbGxhbHZhIEF2aWxhIChjLXZpLWEpIENhcmxvcyBWaWxsYWx2YSBBdmlsYSAoYy12aS1hKSBNZXhpY28gQ2l0eQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/++DEAAAEeAFj9AAAIgRAq08wkIC8jJMUMiYkI0nkFOdVZGkhIUMvcURnCQjGuhQWCB4xjGMYxjVnilOc5zH1t/q4AI//qSJ3/1JAAAATqSJ3/9SQAAApB////UAAAAE6kif/9SQAAAASTEPS7pAAAANKWtLumIQAAbWkBRw8DwPGLo46hYHgeBrHUAPB8HwNE6ITKMA0DOZ8yGH/vDQDCJ4PuY44UH/lRUH4BRP5UUPC9BvQ//hojQGwQn8uIWDYQqP6lA///nrmgwbD/4ak6AwH/Kiq3/////kHwfA1jqsAYDoPg+BonRCZRgGgZzPmQw/94aAYRPB9zHHCg/8qKg/AKJ/KigIIPQf0P/8NEaA2H/LS///+VFQfh/4aI0BsEJ/LiFg2EKj//9+D4Gf//KioAKwWC/yoqACoIIn+VFQ///KioP6qKg///BSf5UVD///BCf5aSACoP6qi///woqD+Sgif///oA=';
+              
+              const beep = new Audio(beepSound);
+              beep.volume = 0.5;
               beep.play();
             } catch (e) {
-              console.log('Não foi possível reproduzir o som de bipe');
+              console.log('Não foi possível reproduzir o som de bipe', e);
             }
             
             // Notificar o componente pai se o callback existir
@@ -108,10 +125,27 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
           }
           
           if (error && !(error instanceof TypeError)) {
-            console.error('Erro durante a leitura:', error);
+            // Incrementar contagem de tentativas para reiniciar o scanner se necessário
+            setScanAttempts(prev => prev + 1);
+            console.log('Tentativa de scan:', scanAttempts);
+            
+            // Logging detalhado do erro
+            console.warn('Erro durante a leitura:', error.name, error.message);
           }
         }
       );
+      
+      // Configurar reinicialização periódica do scanner se não detectar códigos por um tempo
+      intervalRef.current = setInterval(() => {
+        if (scanning && scanAttempts > 30) { // Aprox. 15 segundos sem detecção
+          console.log('Reiniciando scanner devido a falta de detecção...');
+          if (readerRef.current) {
+            readerRef.current.reset();
+            setScanAttempts(0);
+            startScanner(); // Reiniciar o scanner
+          }
+        }
+      }, 500);
     } catch (err) {
       console.error('Erro ao iniciar o scanner:', err);
       setError('Não foi possível acessar a câmera. Verifique as permissões do navegador.');
@@ -121,6 +155,12 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
 
   // Função para parar o scanner
   const stopScanner = () => {
+    console.log('Parando scanner...');
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
     if (readerRef.current) {
       readerRef.current.reset();
     }
@@ -129,6 +169,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
 
   // Função para reiniciar o scanner
   const resetScanner = () => {
+    console.log('Reiniciando scanner...');
     setBarcode('');
     startScanner();
   };
@@ -176,6 +217,22 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
       {error && (
         <div className="w-full bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           <p>{error}</p>
+          <button 
+            onClick={resetScanner}
+            className="mt-2 bg-red-500 text-white py-1 px-3 rounded text-sm"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )}
+      
+      {/* Status do scanner */}
+      {scanning && !error && !barcode && (
+        <div className="w-full bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
+          <p className="flex items-center justify-center">
+            <span className="inline-block w-4 h-4 mr-2 bg-blue-600 rounded-full animate-pulse"></span>
+            Scanner ativo, aproxime o código de barras
+          </p>
         </div>
       )}
       
