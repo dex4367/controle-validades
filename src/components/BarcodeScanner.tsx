@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
-import { FaTimes, FaCamera } from 'react-icons/fa';
+import { FaTimes } from 'react-icons/fa';
 
 interface BarcodeScannerProps {
   onBarcodeDetected: (barcode: string) => void;
@@ -12,128 +12,89 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
   const webcamRef = useRef<Webcam>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [torchOn, setTorchOn] = useState(false);
   const scanIntervalRef = useRef<number | null>(null);
+  const processingRef = useRef(false);
 
   useEffect(() => {
-    // Configurações otimizadas para o leitor de código de barras
+    // Configuração ultra rápida
     const hints = new Map();
-    // Foco apenas nos formatos mais comuns para melhorar a velocidade
+    // Apenas os formatos essenciais para máxima velocidade
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13,
       BarcodeFormat.EAN_8,
       BarcodeFormat.CODE_128,
     ]);
     
-    // Desativar TRY_HARDER para scan mais rápido
+    // Configurações para máxima velocidade e flexibilidade
     hints.set(DecodeHintType.TRY_HARDER, false);
-    
-    // Configurar para ser mais tolerante a erros (mais rápido)
     hints.set(DecodeHintType.PURE_BARCODE, true);
     
     const codeReader = new BrowserMultiFormatReader(hints);
     let stopScanning = false;
 
-    const scanBarcode = async () => {
-      if (stopScanning || !webcamRef.current || !isCameraReady) return;
-
+    // Função simplificada para escaneamento rápido 
+    const scanBarcode = () => {
+      if (stopScanning || !webcamRef.current || !isCameraReady || processingRef.current) return;
+      
+      processingRef.current = true;
+      
       try {
-        // Captura imagem com resolução reduzida para processamento mais rápido
+        // Obter screenshot em baixa qualidade para processamento rápido
         const imageSrc = webcamRef.current.getScreenshot();
         
         if (imageSrc) {
-          // Usar createImageBitmap para processamento mais rápido quando disponível
-          if (typeof createImageBitmap !== 'undefined') {
+          // Método direto para processamento rápido
+          const image = new Image();
+          image.src = imageSrc;
+          
+          image.onload = () => {
             try {
-              const imageBlob = await fetch(imageSrc).then(res => res.blob());
-              const imageBitmap = await createImageBitmap(imageBlob);
-              
-              // Criar canvas temporário
-              const canvas = document.createElement('canvas');
-              canvas.width = imageBitmap.width;
-              canvas.height = imageBitmap.height;
-              const ctx = canvas.getContext('2d');
-              
-              if (ctx) {
-                // Desenhar imagem no canvas
-                ctx.drawImage(imageBitmap, 0, 0);
-                
-                // Converter para URL de dados para usar com o decodificador
-                const dataUrl = canvas.toDataURL('image/jpeg');
-                
-                try {
-                  // Tentar decodificar a partir da URL de dados
-                  const img = new Image();
-                  img.src = dataUrl;
-                  
-                  // Processar imagem quando estiver carregada
-                  img.onload = async () => {
-                    try {
-                      const result = await codeReader.decodeFromImage(img);
-                      if (result && result.getText()) {
-                        onBarcodeDetected(result.getText());
-                        stopScanning = true;
-                      }
-                    } catch (e) {
-                      // Ignorar erros de decodificação
-                    }
-                  };
-                } catch (e) {
-                  // Ignorar erros de decodificação
-                }
-              }
+              // Processar imagem imediatamente
+              codeReader.decodeFromImage(image)
+                .then(result => {
+                  if (result && result.getText()) {
+                    // Código detectado!
+                    onBarcodeDetected(result.getText());
+                    stopScanning = true;
+                  }
+                })
+                .catch(() => {
+                  // Ignorar erros, continuar escaneamento
+                })
+                .finally(() => {
+                  processingRef.current = false;
+                });
             } catch (e) {
-              // Fallback para método antigo se createImageBitmap falhar
-              processWithImage(imageSrc);
+              // Apenas liberar o processamento
+              processingRef.current = false;
             }
-          } else {
-            // Fallback para navegadores que não suportam createImageBitmap
-            processWithImage(imageSrc);
-          }
+          };
+          
+          image.onerror = () => {
+            processingRef.current = false;
+          };
+        } else {
+          processingRef.current = false;
         }
-        
-        // Continuar o loop de escaneamento com requestAnimationFrame para melhor desempenho
-        if (!stopScanning) {
-          requestAnimationFrame(scanBarcode);
-        }
-      } catch (error) {
-        console.error('Erro ao escanear código de barras:', error);
-        requestAnimationFrame(scanBarcode);
-      }
-    };
-
-    const processWithImage = async (imageSrc: string) => {
-      try {
-        const image = new Image();
-        image.src = imageSrc;
-        
-        // Usar evento onload em vez de promise para melhor desempenho
-        image.onload = async () => {
-          try {
-            const result = await codeReader.decodeFromImage(image);
-            if (result && result.getText()) {
-              onBarcodeDetected(result.getText());
-              stopScanning = true;
-            }
-          } catch (e) {
-            // Ignorar erros de decodificação
-          }
-        };
       } catch (e) {
-        // Ignorar erros
+        processingRef.current = false;
       }
     };
 
     if (isCameraReady) {
-      // Iniciar escaneamento imediatamente
-      scanBarcode();
+      // Escaneamento agressivo - múltiplas estratégias em paralelo
       
-      // Também configurar um intervalo para garantir execução frequente
-      scanIntervalRef.current = window.setInterval(() => {
+      // Estratégia 1: Intervalos curtos e frequentes
+      scanIntervalRef.current = window.setInterval(scanBarcode, 100);
+      
+      // Estratégia 2: Processamento via frame animation
+      const animFrame = () => {
         if (!stopScanning) {
           scanBarcode();
+          requestAnimationFrame(animFrame);
         }
-      }, 200); // Tentar escanear a cada 200ms mesmo se o requestAnimationFrame falhar
+      };
+      requestAnimationFrame(animFrame);
     }
 
     return () => {
@@ -159,9 +120,9 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden w-11/12 max-w-sm">
-        {/* Cabeçalho */}
-        <div className="flex justify-between items-center p-3 bg-blue-600 text-white">
-          <h3 className="text-base font-medium">Scanner de Código</h3>
+        {/* Cabeçalho simplificado */}
+        <div className="flex justify-between items-center p-2 bg-blue-600 text-white">
+          <h3 className="text-base font-medium">Scanner Rápido</h3>
           <button 
             onClick={onClose}
             className="text-white p-1 rounded-full hover:bg-blue-700 transition-colors"
@@ -181,11 +142,11 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
               ref={webcamRef}
               audio={false}
               screenshotFormat="image/jpeg"
-              screenshotQuality={0.7} // Reduzir qualidade para processamento mais rápido
+              screenshotQuality={0.5} // Reduzir ainda mais a qualidade para velocidade máxima
               videoConstraints={{
                 facingMode: 'environment',
-                width: { min: 640, ideal: 1280, max: 1920 },
-                height: { min: 480, ideal: 720, max: 1080 },
+                width: { min: 320, ideal: 640, max: 1280 }, // Reduzir resolução para processamento mais rápido
+                height: { min: 240, ideal: 480, max: 720 },
                 aspectRatio: 4/3,
                 frameRate: { ideal: 30, min: 15 },
               }}
@@ -195,33 +156,22 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
               mirrored={false}
             />
             
-            {/* Área de foco para o código de barras */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="relative w-3/4 h-16">
-                {/* Bordas cantos */}
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-green-500"></div>
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-green-500"></div>
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-green-500"></div>
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-green-500"></div>
-                
-                {/* Linha de escaneamento animada */}
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="h-0.5 bg-green-500 w-full absolute top-1/2 animate-scan-line"></div>
-                </div>
+            {/* Sem área de foco específica - detecção em qualquer lugar */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-white text-sm bg-black bg-opacity-50 px-2 py-1 rounded">
+                  Aponte para qualquer código de barras
+                </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Instruções */}
-        <div className="p-3 bg-gray-50">
-          <p className="text-xs text-center text-gray-600 mb-2">
-            Posicione o código de barras na área verde
-          </p>
+        <div className="p-2 bg-gray-50">
           <div className="flex justify-center">
             <button 
               onClick={onClose}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300 transition-colors"
+              className="bg-gray-200 text-gray-800 px-4 py-1 rounded text-sm font-medium hover:bg-gray-300 transition-colors"
             >
               Cancelar
             </button>
