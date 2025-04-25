@@ -8,26 +8,20 @@ interface BarcodeScannerProps {
   onClose: () => void;
 }
 
-// Versão ultra-simplificada da validação para máxima velocidade
-function isValidBarcode(code: string): boolean {
-  return Boolean(code && code.length > 5 && /^[A-Za-z0-9]+$/.test(code));
-}
-
 const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => {
   const webcamRef = useRef<Webcam>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
   const processingRef = useRef(false);
-  const lastProcessedTimestampRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
 
   // Criar canvas ao montar
   useEffect(() => {
     const canvas = document.createElement('canvas');
-    canvas.width = 320;  // Resolução ultra-baixa
-    canvas.height = 240;
+    canvas.width = 240;  // Resolução micro
+    canvas.height = 180;
     canvasRef.current = canvas;
     contextRef.current = canvas.getContext('2d');
     
@@ -38,86 +32,72 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
   }, []);
 
   useEffect(() => {
-    // Configuração de máxima velocidade
+    // Configuração super-básica
     const hints = new Map();
     
-    // Apenas um formato para máxima velocidade
+    // Incluir TODOS os formatos de código de barras comuns
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8, 
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.QR_CODE,
     ]);
     
-    // Desativar verificações adicionais para velocidade
-    hints.set(DecodeHintType.TRY_HARDER, false);
-    hints.set(DecodeHintType.PURE_BARCODE, true);
+    // Configuração para máxima detecção
+    hints.set(DecodeHintType.TRY_HARDER, true);
     
     const codeReader = new BrowserMultiFormatReader(hints);
     let stopScanning = false;
     
-    // Função ultra-otimizada sem validações adicionais
+    // Função ultra-rápida sem qualquer validação
     const scanBarcode = () => {
       if (stopScanning || !webcamRef.current || !isCameraReady || processingRef.current) return;
       
       processingRef.current = true;
       
       try {
-        const video = webcamRef.current.video;
-        if (!video || !contextRef.current || !canvasRef.current) {
+        if (webcamRef.current.getScreenshot) {
+          // Método direto - screenshot
+          const screenshot = webcamRef.current.getScreenshot({
+            width: 240,
+            height: 180
+          });
+          
+          if (screenshot) {
+            const image = new Image();
+            image.onload = () => {
+              codeReader.decodeFromImage(image)
+                .then(result => {
+                  if (result && result.getText()) {
+                    // ZERO validação - aceitar qualquer código detectado
+                    onBarcodeDetected(result.getText());
+                    stopScanning = true;
+                  }
+                })
+                .catch(() => {})
+                .finally(() => {
+                  processingRef.current = false;
+                });
+            };
+            image.src = screenshot;
+          } else {
+            processingRef.current = false;
+          }
+        } else {
           processingRef.current = false;
-          return;
         }
-        
-        // Método direto, sem captura de screenshot
-        contextRef.current.drawImage(
-          video,
-          0, 0, video.videoWidth, video.videoHeight,
-          0, 0, canvasRef.current.width, canvasRef.current.height
-        );
-        
-        const imageData = contextRef.current.getImageData(
-          0, 0, canvasRef.current.width, canvasRef.current.height
-        );
-        
-        // Converter imageData para HTML image para usar com o decoder
-        const canvas = canvasRef.current;
-        const dataURL = canvas.toDataURL('image/jpeg', 0.5);
-        const image = new Image();
-        
-        image.onload = () => {
-          // Usar o método correto do codeReader
-          codeReader.decodeFromImage(image)
-            .then((result) => {
-              if (result && result.getText()) {
-                const text = result.getText();
-                
-                // Validação mínima - apenas verificar se não está vazio
-                if (isValidBarcode(text)) {
-                  onBarcodeDetected(text);
-                  stopScanning = true;
-                }
-              }
-            })
-            .catch(() => {})
-            .finally(() => {
-              processingRef.current = false;
-            });
-        };
-        
-        image.src = dataURL;
-        image.onerror = () => {
-          processingRef.current = false;
-        };
       } catch (e) {
         processingRef.current = false;
       }
     };
 
     if (isCameraReady) {
-      // Escaneamento ultra-agressivo
+      // ESCANEAMENTO ULTRA-INTENSIVO
       
-      // Múltiplos intervalos paralelos para garantir máxima velocidade
-      scanIntervalRef.current = window.setInterval(scanBarcode, 30); // 33 tentativas/segundo
-      
-      // Processamento via frame animation
+      // Método 1: RequestAnimationFrame (tão rápido quanto possível)
       const animFrame = () => {
         if (!stopScanning) {
           scanBarcode();
@@ -126,18 +106,21 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
       };
       requestAnimationFrame(animFrame);
       
-      // Boost inicial extremo
-      const rapidIntervals: number[] = [];
-      for (let i = 0; i < 5; i++) {
-        // Múltiplos scanners paralelos com delays variados
-        const interval = window.setInterval(scanBarcode, 10 + i*3);
-        rapidIntervals.push(interval);
+      // Método 2: Intervalos múltiplos em paralelo
+      const intervals: number[] = [];
+      
+      // 10 scanners paralelos com frequências variadas
+      for (let i = 0; i < 10; i++) {
+        intervals.push(window.setInterval(scanBarcode, 10 + i * 2));
       }
       
-      // Limpar boost após 3 segundos
+      // Método 3: Intervalo principal constante
+      scanIntervalRef.current = window.setInterval(scanBarcode, 30);
+      
+      // Limpar recursos paralelos após 5 segundos (mantém apenas o intervalo principal)
       setTimeout(() => {
-        rapidIntervals.forEach(interval => clearInterval(interval));
-      }, 3000);
+        intervals.forEach(interval => clearInterval(interval));
+      }, 5000);
     }
 
     return () => {
@@ -164,7 +147,7 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden w-full max-w-sm mx-4">
         <div className="flex justify-between items-center p-1 bg-blue-600 text-white">
-          <h3 className="text-xs font-medium px-1">Scanner Turbinado</h3>
+          <h3 className="text-xs font-medium px-1">Scanner Instantâneo</h3>
           <button 
             onClick={onClose}
             className="text-white p-1"
@@ -183,12 +166,14 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
             <Webcam
               ref={webcamRef}
               audio={false}
+              screenshotFormat="image/jpeg"
+              screenshotQuality={0.1} // Qualidade ultra baixa para velocidade máxima
               videoConstraints={{
                 facingMode: 'environment',
-                width: { min: 320, ideal: 640, max: 1280 },
-                height: { min: 240, ideal: 480, max: 720 },
+                width: { min: 240, ideal: 480, max: 720 }, // Resolução reduzida
+                height: { min: 180, ideal: 360, max: 540 },
                 aspectRatio: 4/3,
-                frameRate: { ideal: 30, min: 20 },
+                frameRate: { ideal: 30, min: 15 },
               }}
               onUserMedia={handleUserMedia}
               onUserMediaError={handleUserMediaError}
@@ -197,10 +182,10 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
             />
             
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="bg-black bg-opacity-50 px-2 py-0.5 rounded-full flex items-center">
+              <div className="bg-black bg-opacity-50 px-2 py-0.5 rounded-full flex items-center animate-pulse">
                 <FaBolt className="text-yellow-400 mr-1" size={12} />
                 <p className="text-white text-xs">
-                  Aproxime o código
+                  Aproxime qualquer código
                 </p>
               </div>
             </div>
