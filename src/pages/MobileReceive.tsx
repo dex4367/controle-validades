@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { getProductByBarcode, createProduct, getCategories } from '../services/supabase'
-import DatePicker from 'react-datepicker'
-// Usando o arquivo CSS personalizado
-import '../styles/datepicker.css'
-// Importando ícones modernos
+// Removendo a importação do DatePicker que não será mais necessária
+// import DatePicker from 'react-datepicker'
+// import '../styles/datepicker.css'
 import { 
   FaBarcode, 
   FaCheckCircle, 
@@ -16,7 +15,8 @@ import {
   FaBackspace,
   FaSearch,
   FaBoxOpen,
-  FaCamera
+  FaCamera,
+  FaCalendarAlt
 } from 'react-icons/fa'
 import BarcodeScanner from '../components/BarcodeScanner'
 
@@ -93,10 +93,8 @@ const MobileReceive = () => {
         setMessage(null)
       }
       
-      // Definir data de validade padrão para hoje
-      const today = new Date();
-      setExpiryDate(today);
-      setExpiryDateStr(today.toISOString().split('T')[0]);
+      // Definir data de validade padrão como vazia para o novo sistema
+      setExpiryDateStr('');
       
       console.log('🔄 Alterando step para "form"');
       setStep('form');
@@ -142,112 +140,169 @@ const MobileReceive = () => {
     checkProduct(detectedBarcode)
   }
 
-  const handleDateChange = (date: Date | null) => {
-    if (date) {
-      setExpiryDate(date);
-      setExpiryDateStr(date.toISOString().split('T')[0]);
+  const handleExpiryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    
+    // Remove qualquer caractere que não seja número
+    value = value.replace(/[^\d]/g, '');
+    
+    // Formata com barras conforme o usuário digita
+    if (value.length <= 2) {
+      // Apenas dia
+      setExpiryDateStr(value);
+    } else if (value.length <= 4) {
+      // Dia e mês
+      setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2)}`);
+    } else if (value.length <= 6) {
+      // Dia, mês e ano
+      setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`);
+    } else {
+      // Limita a 6 dígitos (dd/mm/aa)
+      setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4, 6)}`);
     }
-  }
+    
+    // Atualiza o estado da data
+    try {
+      if (value.length === 6) {
+        // Converte para um objeto Date
+        const day = parseInt(value.slice(0, 2));
+        const month = parseInt(value.slice(2, 4)) - 1; // Mês em JavaScript é 0-indexado
+        const year = parseInt(`20${value.slice(4, 6)}`); // Assume anos 2000
+        
+        const dateObj = new Date(year, month, day);
+        
+        // Verifica se é uma data válida
+        if (!isNaN(dateObj.getTime())) {
+          setExpiryDate(dateObj);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao converter data:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!productName || !expiryDateStr || !categoryId) {
+    // Validação adicional para o formato de data
+    const dateRegex = /^(\d{2})\/(\d{2})\/(\d{2})$/;
+    if (!dateRegex.test(expiryDateStr)) {
       setMessage({
         type: 'error',
-        text: 'Preencha todos os campos obrigatórios'
-      })
-      return
+        text: 'Por favor, insira a data no formato DD/MM/AA'
+      });
+      return;
     }
     
-    try {
-      setLoading(true)
+    // Extrair componentes da data
+    const matches = expiryDateStr.match(dateRegex);
+    if (matches) {
+      const day = parseInt(matches[1]);
+      const month = parseInt(matches[2]);
+      const year = parseInt(`20${matches[3]}`);
       
-      // Verificar se já existe produto com o mesmo código de barras E mesma data de validade
-      const duplicateInList = products.find(
-        p => p.barcode === barcode && p.expiry_date === expiryDateStr && (editingIndex === null || products.indexOf(p) !== editingIndex)
-      )
-      
-      if (duplicateInList) {
+      // Validação de data
+      if (day < 1 || day > 31 || month < 1 || month > 12) {
         setMessage({
           type: 'error',
-          text: 'ATENÇÃO! Já existe um produto com mesmo código de barras e mesma data de validade na lista.'
-        })
-        setLoading(false)
-        return
+          text: 'Data de validade inválida. Verifique dia e mês.'
+        });
+        return;
       }
       
-      // Não salvar no banco de dados agora, apenas adicionar à lista
-      // await createProduct({
-      //   name: productName,
-      //   barcode,
-      //   category_id: categoryId,
-      //   expiry_date: expiryDateStr
-      // })
+      // Criar objeto de data para verificação final
+      const dateObj = new Date(year, month - 1, day);
+      if (isNaN(dateObj.getTime())) {
+        setMessage({
+          type: 'error',
+          text: 'Data de validade inválida.'
+        });
+        return;
+      }
       
-      // Adicionar à lista de produtos recebidos
-      const category = categories.find(cat => cat.id === categoryId)
+      // Formato da data para o banco de dados (yyyy-mm-dd)
+      const formattedDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
       
-      if (editingIndex !== null) {
-        // Editando um produto existente na lista
-        const updatedProducts = [...products];
-        updatedProducts[editingIndex] = {
-          name: productName,
-          barcode,
-          category: category?.name || 'Sem categoria',
-          expiry_date: expiryDateStr,
-          category_id: categoryId
-        };
-        setProducts(updatedProducts);
-        setEditingIndex(null);
-      } else {
-        // Adicionando novo produto
-        setProducts([
-          ...products, 
-          {
+      // Verificação de produtos e o restante do código...
+      try {
+        setLoading(true)
+        
+        // Verificar se já existe produto com o mesmo código de barras E mesma data de validade
+        const duplicateInList = products.find(
+          p => p.barcode === barcode && p.expiry_date === formattedDate && (editingIndex === null || products.indexOf(p) !== editingIndex)
+        )
+        
+        if (duplicateInList) {
+          setMessage({
+            type: 'error',
+            text: 'ATENÇÃO! Já existe um produto com mesmo código de barras e mesma data de validade na lista.'
+          })
+          setLoading(false)
+          return
+        }
+        
+        // Adicionar à lista de produtos recebidos
+        const category = categories.find(cat => cat.id === categoryId)
+        
+        if (editingIndex !== null) {
+          // Editando um produto existente na lista
+          const updatedProducts = [...products];
+          updatedProducts[editingIndex] = {
             name: productName,
             barcode,
             category: category?.name || 'Sem categoria',
-            expiry_date: expiryDateStr,
+            expiry_date: formattedDate,
             category_id: categoryId
-          }
-        ]);
+          };
+          setProducts(updatedProducts);
+          setEditingIndex(null);
+        } else {
+          // Adicionando novo produto
+          setProducts([
+            ...products, 
+            {
+              name: productName,
+              barcode,
+              category: category?.name || 'Sem categoria',
+              expiry_date: formattedDate,
+              category_id: categoryId
+            }
+          ]);
+        }
+        
+        // Limpar formulário
+        setBarcode('')
+        setProductName('')
+        setExpiryDateStr('')
+        setExistingProduct(null)
+        
+        setMessage({
+          type: 'success',
+          text: editingIndex !== null ? 'Produto atualizado com sucesso!' : 'Produto adicionado à lista!'
+        })
+        
+        // Voltar para o scanner após 1.5 segundos
+        setTimeout(() => {
+          setStep('scan')
+          setMessage(null)
+        }, 1500)
+        
+      } catch (error) {
+        console.error('Erro ao processar produto:', error)
+        setMessage({
+          type: 'error',
+          text: 'Erro ao processar produto. Tente novamente.'
+        })
+      } finally {
+        setLoading(false)
       }
-      
-      // Limpar formulário
-      setBarcode('')
-      setProductName('')
-      setExpiryDateStr('')
-      setExistingProduct(null)
-      
-      setMessage({
-        type: 'success',
-        text: editingIndex !== null ? 'Produto atualizado com sucesso!' : 'Produto adicionado à lista!'
-      })
-      
-      // Voltar para o scanner após 1.5 segundos
-      setTimeout(() => {
-        setStep('scan')
-        setMessage(null)
-      }, 1500)
-      
-    } catch (error) {
-      console.error('Erro ao processar produto:', error)
-      setMessage({
-        type: 'error',
-        text: 'Erro ao processar produto. Tente novamente.'
-      })
-    } finally {
-      setLoading(false)
     }
   }
 
   const resetForm = () => {
     setBarcode('')
     setProductName('')
-    const today = new Date()
-    setExpiryDate(today)
-    setExpiryDateStr(today.toISOString().split('T')[0])
+    setExpiryDateStr('')
     setExistingProduct(null)
     setMessage(null)
     setStep('scan')
@@ -259,8 +314,15 @@ const MobileReceive = () => {
     setBarcode(product.barcode)
     setProductName(product.name)
     setCategoryId(product.category_id)
-    setExpiryDateStr(product.expiry_date)
-    setExpiryDate(new Date(product.expiry_date))
+    
+    // Formatar data para DD/MM/AA
+    const date = new Date(product.expiry_date)
+    const day = date.getDate().toString().padStart(2, '0')
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const year = date.getFullYear().toString().slice(2)
+    setExpiryDateStr(`${day}/${month}/${year}`)
+    
+    setExpiryDate(date)
     setEditingIndex(index)
     setStep('form')
   }
@@ -353,7 +415,7 @@ const MobileReceive = () => {
           name: product.name,
           barcode: product.barcode,
           category_id: product.category_id,
-          expiry_date: product.expiry_date
+          expiry_date: product.expiry_date // Agora já está no formato correto (yyyy-mm-dd)
         });
         
         addedCount++;
@@ -364,10 +426,9 @@ const MobileReceive = () => {
       setBarcode('');
       setProductName('');
       
-      // Atualizar os estados de data
-      const today = new Date();
-      setExpiryDate(today);
-      setExpiryDateStr(today.toISOString().split('T')[0]);
+      // Limpar a data de validade
+      setExpiryDateStr('');
+      setExpiryDate(new Date());
       
       setExistingProduct(null);
       
@@ -517,15 +578,22 @@ const MobileReceive = () => {
                 </div>
   
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Data de Validade</label>
-                  <DatePicker
-                    selected={expiryDate}
-                    onChange={handleDateChange}
-                    dateFormat="dd/MM/yyyy"
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                    minDate={new Date()}
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data de Validade (DD/MM/AA)</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={expiryDateStr}
+                      onChange={handleExpiryDateChange}
+                      placeholder="DD/MM/AA"
+                      maxLength={8}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                    <FaCalendarAlt className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Formato: Dia/Mês/Ano (ex: 31/12/23)</p>
                 </div>
   
                 <div>
