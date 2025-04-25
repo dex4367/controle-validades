@@ -63,33 +63,6 @@ const MobileReceive = () => {
     // Buscar categorias no primeiro carregamento
     loadCategories()
 
-    // Verificar se o navegador suporta getUserMedia
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      // Mostrar prompt de permissão e iniciar o scanner
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-        .then(stream => {
-          // Parar o stream imediatamente, apenas para garantir a permissão
-          stream.getTracks().forEach(track => track.stop());
-          
-          // Iniciar scanner com atraso
-          setTimeout(() => {
-            startScan();
-          }, 1000);
-        })
-        .catch(error => {
-          console.error("Erro de permissão da câmera:", error);
-          setMessage({
-            type: 'error',
-            text: 'Permissão da câmera negada. Por favor, permita o acesso à câmera nas configurações do seu navegador.'
-          });
-        });
-    } else {
-      setMessage({
-        type: 'error',
-        text: 'Seu navegador não suporta acesso à câmera. Tente outro navegador.'
-      });
-    }
-
     // Limpar ao desmontar
     return () => {
       if (codeReader.current) {
@@ -115,12 +88,27 @@ const MobileReceive = () => {
     }
   }
 
-  const startScan = async () => {
-    if (!codeReader.current || !videoRef.current) return
+  const startScan = () => {
+    if (!codeReader.current || !videoRef.current) {
+      console.error('Referências não disponíveis:', { 
+        codeReader: !!codeReader.current, 
+        videoRef: !!videoRef.current 
+      });
+      setMessage({
+        type: 'error',
+        text: 'Erro ao inicializar o scanner. Tente novamente.'
+      });
+      return;
+    }
     
     try {
-      setScanning(true)
-      setMessage(null)
+      setScanning(true);
+      setMessage(null);
+      
+      // Reset antes de iniciar para limpar qualquer estado anterior
+      codeReader.current.reset();
+      
+      console.log('Iniciando scanner...');
       
       // Configurações específicas para a câmera móvel
       const constraints = {
@@ -129,31 +117,34 @@ const MobileReceive = () => {
         height: { ideal: 720 }
       };
       
-      // Iniciar o scanner diretamente
+      // Iniciar o scanner diretamente, sem verificações adicionais
       codeReader.current.decodeFromConstraints(
         { video: constraints },
-        videoRef.current as HTMLVideoElement,
+        videoRef.current,
         (result, error) => {
           if (result) {
-            const barcodeValue = result.getText()
-            setBarcode(barcodeValue)
-            stopScan()
-            checkProduct(barcodeValue)
+            console.log('Código detectado:', result.getText());
+            const barcodeValue = result.getText();
+            setBarcode(barcodeValue);
+            stopScan();
+            checkProduct(barcodeValue);
           }
           if (error && !(error instanceof TypeError)) {
-            console.error('Erro durante a leitura:', error)
+            console.error('Erro durante a leitura:', error);
           }
         }
-      )
+      );
+      
+      console.log('Scanner iniciado com sucesso');
     } catch (err) {
-      console.error('Erro ao iniciar o scanner:', err)
+      console.error('Erro ao iniciar o scanner:', err);
       setMessage({
         type: 'error',
         text: 'Não foi possível acessar a câmera. Verifique as permissões do navegador.'
-      })
-      setScanning(false)
+      });
+      setScanning(false);
     }
-  }
+  };
 
   const stopScan = () => {
     if (codeReader.current) {
