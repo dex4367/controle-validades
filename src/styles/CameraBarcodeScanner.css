@@ -11,12 +11,12 @@
 }
 
 .scanner-header {
-  display: flex;
-  align-items: center;
-  padding: 1rem;
-  background-color: #008000;
-  color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex !important;
+  align-items: center !important;
+  padding: 1rem !important;
+  background-color: #008000 !important;
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
 }
 
 .back-button {
@@ -61,6 +61,16 @@
   margin-bottom: 20px;
   color: #374151;
   line-height: 1.5;
+}
+
+.scanner-instructions .start-button {
+  background-color: #008000 !important;
+  color: white !important;
+  transition: background-color 0.3s !important;
+}
+
+.scanner-instructions .start-button:hover {
+  background-color: #006400 !important;
 }
 
 .start-button,
@@ -201,28 +211,22 @@
 
 /* Linha de escaneamento animada */
 .scan-line {
-  position: absolute;
-  top: 20%;
-  left: 10%;
-  width: 80%;
-  height: 3px;
-  background-color: #e30613;
-  box-shadow: 0 0 8px 2px rgba(227, 6, 19, 0.8);
-  z-index: 15;
-  animation: scanAnimation 2.5s linear infinite;
-  pointer-events: none;
+  position: absolute !important;
+  top: 20% !important;
+  left: 10% !important;
+  width: 80% !important;
+  height: 5px !important;
+  background-color: #e30613 !important;
+  box-shadow: 0 0 8px 2px rgba(227, 6, 19, 0.8) !important;
+  z-index: 15 !important;
+  animation: scanAnimation 3s linear infinite !important;
+  pointer-events: none !important;
 }
 
 @keyframes scanAnimation {
-  0% {
-    top: 20%;
-  }
-  50% {
-    top: 80%;
-  }
-  100% {
-    top: 20%;
-  }
+  0% { top: 20% !important; }
+  50% { top: 80% !important; }
+  100% { top: 20% !important; }
 }
 
 .scanning-message {

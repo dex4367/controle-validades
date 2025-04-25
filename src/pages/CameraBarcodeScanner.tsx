@@ -19,6 +19,28 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
 
+  // Estilos inline para garantir que sejam aplicados
+  const headerStyle = {
+    backgroundColor: '#008000', // Verde
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    padding: '1rem',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+  };
+
+  const scanLineStyle = {
+    position: 'absolute' as 'absolute',
+    top: '30%',
+    left: '10%',
+    width: '80%',
+    height: '3px',
+    backgroundColor: '#e30613',
+    boxShadow: '0 0 8px 2px rgba(227, 6, 19, 0.8)',
+    zIndex: 15,
+    animation: 'scanAnimation 3s linear infinite'
+  };
+
   const startScanner = async () => {
     setError(null);
     setBarcode(null);
@@ -144,7 +166,7 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
 
   return (
     <div className="camera-scanner-container">
-      <div className="scanner-header">
+      <div style={headerStyle}>
         <button className="back-button" onClick={goBack}>
           <FaArrowLeft className="mr-2" /> Voltar
         </button>
@@ -155,7 +177,11 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
         {!scanning ? (
           <div className="scanner-instructions">
             <p>Aponte a câmera para o código de barras do produto para escanear automaticamente.</p>
-            <button className="start-button" onClick={startScanner}>
+            <button 
+              className="start-button" 
+              onClick={startScanner}
+              style={{backgroundColor: '#008000'}}
+            >
               <FaCamera className="mr-2" /> Iniciar Scanner
             </button>
           </div>
@@ -173,8 +199,8 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
                 <div className="corner bottom-right"></div>
               </div>
               
-              {/* Linha de escaneamento animada (movida para fora do scan-frame para melhor funcionamento) */}
-              <div className="scan-line"></div>
+              {/* Linha de escaneamento com estilo inline para garantir que funcione */}
+              <div style={scanLineStyle}></div>
               
               {/* Mensagem de orientação durante o escaneamento */}
               <div className="scanning-message">
@@ -199,6 +225,15 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
 
         {error && <div className="error-message">{error}</div>}
       </div>
+
+      {/* Estilo para a animação da linha */}
+      <style>{`
+        @keyframes scanAnimation {
+          0% { top: 20%; }
+          50% { top: 80%; }
+          100% { top: 20%; }
+        }
+      `}</style>
     </div>
   );
 };
