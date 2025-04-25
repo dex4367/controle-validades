@@ -33,31 +33,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onError }) => {
     },
     paused: !isActive,
     constraints: constraints,
-    timeBetweenDecodingAttempts: 300,
-    preferredCamera: 'environment',
-    hints: {
-      // Suporta apenas formatos de códigos de barras 1D
-      TRY_HARDER: true,
-      PURE_BARCODE: true,
-      ASSUME_GS1: false,
-      POSSIBLE_FORMATS: [
-        'CODABAR',
-        'CODE_39',
-        'CODE_93',
-        'CODE_128',
-        'EAN_8',
-        'EAN_13',
-        'ITF',
-        'RSS_14',
-        'RSS_EXPANDED',
-        'UPC_A',
-        'UPC_E',
-        'UPC_EAN_EXTENSION'
-      ],
-      // Permite reconhecimento em várias orientações
-      TRY_INVERTED: true,
-      CHARACTER_SET: 'UTF-8'
-    }
+    timeBetweenDecodingAttempts: 300
   });
 
   // Alterna entre câmeras frontal e traseira
@@ -101,7 +77,8 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onError }) => {
         )}
       </div>
       
-      <style>{`
+      <style>
+        {`
         .barcode-scanner-container {
           width: 100%;
           max-width: 500px;
@@ -228,7 +205,8 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onError }) => {
         .camera-switch:hover {
           background-color: rgba(0, 0, 0, 0.7);
         }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };
