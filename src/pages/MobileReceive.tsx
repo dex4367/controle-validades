@@ -143,32 +143,50 @@ const MobileReceive = () => {
   const handleExpiryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
     
-    // Remove qualquer caractere que não seja número
-    value = value.replace(/[^\d]/g, '');
-    
-    // Formata com barras conforme o usuário digita
-    if (value.length <= 2) {
-      // Apenas dia
+    // Se o usuário colocar as barras, mantém
+    if (value.includes('/')) {
+      // Apenas garantimos que não existam caracteres não numéricos exceto barras
+      value = value.replace(/[^\d\/]/g, '');
       setExpiryDateStr(value);
-    } else if (value.length <= 4) {
-      // Dia e mês
-      setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2)}`);
-    } else if (value.length <= 6) {
-      // Dia, mês e ano
-      setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`);
     } else {
-      // Limita a 6 dígitos (dd/mm/aa)
-      setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4, 6)}`);
+      // Remove qualquer caractere que não seja número
+      value = value.replace(/[^\d]/g, '');
+      
+      // Formata com barras conforme o usuário digita
+      if (value.length <= 2) {
+        // Apenas dia
+        setExpiryDateStr(value);
+      } else if (value.length <= 4) {
+        // Dia e mês
+        setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2)}`);
+      } else if (value.length <= 6) {
+        // Dia, mês e ano
+        setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`);
+      } else {
+        // Limita a 6 dígitos (dd/mm/aa)
+        setExpiryDateStr(`${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4, 6)}`);
+      }
     }
     
     // Atualiza o estado da data
     try {
-      if (value.length === 6) {
-        // Converte para um objeto Date
-        const day = parseInt(value.slice(0, 2));
-        const month = parseInt(value.slice(2, 4)) - 1; // Mês em JavaScript é 0-indexado
-        const year = parseInt(`20${value.slice(4, 6)}`); // Assume anos 2000
-        
+      // Extrai os componentes da data (com ou sem barras)
+      let day, month, year;
+      
+      if (value.includes('/')) {
+        const parts = value.split('/');
+        day = parseInt(parts[0] || '0');
+        month = parseInt(parts[1] || '0') - 1;  // Mês em JS é 0-indexado
+        year = parts[2] ? parseInt(`20${parts[2]}`) : 0;
+      } else if (value.length >= 6) {
+        day = parseInt(value.slice(0, 2));
+        month = parseInt(value.slice(2, 4)) - 1;
+        year = parseInt(`20${value.slice(4, 6)}`);
+      } else {
+        return; // Data incompleta, não atualiza o objeto Date
+      }
+      
+      if (day > 0 && month >= 0 && year > 0) {
         const dateObj = new Date(year, month, day);
         
         // Verifica se é uma data válida
@@ -184,118 +202,139 @@ const MobileReceive = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validação adicional para o formato de data
-    const dateRegex = /^(\d{2})\/(\d{2})\/(\d{2})$/;
-    if (!dateRegex.test(expiryDateStr)) {
+    if (!productName || !barcode || !expiryDateStr || !categoryId) {
       setMessage({
         type: 'error',
-        text: 'Por favor, insira a data no formato DD/MM/AA'
+        text: 'Preencha todos os campos obrigatórios'
       });
       return;
     }
     
-    // Extrair componentes da data
-    const matches = expiryDateStr.match(dateRegex);
-    if (matches) {
-      const day = parseInt(matches[1]);
-      const month = parseInt(matches[2]);
-      const year = parseInt(`20${matches[3]}`);
-      
-      // Validação de data
-      if (day < 1 || day > 31 || month < 1 || month > 12) {
+    // Processamento da data com validação mais flexível
+    let formattedDate = '';
+    let day = 0, month = 0, year = 0;
+    
+    // Verificar se a data tem barras
+    if (expiryDateStr.includes('/')) {
+      const parts = expiryDateStr.split('/');
+      if (parts.length < 3) {
         setMessage({
           type: 'error',
-          text: 'Data de validade inválida. Verifique dia e mês.'
+          text: 'Formato de data inválido. Use DD/MM/AA'
         });
         return;
       }
       
-      // Criar objeto de data para verificação final
-      const dateObj = new Date(year, month - 1, day);
-      if (isNaN(dateObj.getTime())) {
+      day = parseInt(parts[0]);
+      month = parseInt(parts[1]);
+      year = parseInt(`20${parts[2]}`);
+    } else if (expiryDateStr.length === 6) {
+      // Formato sem barra (DDMMAA)
+      day = parseInt(expiryDateStr.slice(0, 2));
+      month = parseInt(expiryDateStr.slice(2, 4));
+      year = parseInt(`20${expiryDateStr.slice(4, 6)}`);
+    } else {
+      setMessage({
+        type: 'error',
+        text: 'Formato de data inválido. Use DD/MM/AA'
+      });
+      return;
+    }
+    
+    // Validação de dia e mês
+    if (day < 1 || day > 31 || month < 1 || month > 12) {
+      setMessage({
+        type: 'error',
+        text: 'Data de validade inválida. Verifique dia e mês.'
+      });
+      return;
+    }
+    
+    // Criar objeto de data para verificação final
+    const dateObj = new Date(year, month - 1, day);
+    if (isNaN(dateObj.getTime())) {
+      setMessage({
+        type: 'error',
+        text: 'Data de validade inválida.'
+      });
+      return;
+    }
+    
+    // Formato da data para o banco de dados (yyyy-mm-dd)
+    formattedDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    
+    // Continuação do código de envio...
+    try {
+      setLoading(true)
+      
+      // Verificar se já existe produto com o mesmo código de barras E mesma data de validade
+      const duplicateInList = products.find(
+        p => p.barcode === barcode && p.expiry_date === formattedDate && (editingIndex === null || products.indexOf(p) !== editingIndex)
+      )
+      
+      if (duplicateInList) {
         setMessage({
           type: 'error',
-          text: 'Data de validade inválida.'
-        });
-        return;
+          text: 'ATENÇÃO! Já existe um produto com mesmo código de barras e mesma data de validade na lista.'
+        })
+        setLoading(false)
+        return
       }
       
-      // Formato da data para o banco de dados (yyyy-mm-dd)
-      const formattedDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      // Adicionar à lista de produtos recebidos
+      const category = categories.find(cat => cat.id === categoryId)
       
-      // Verificação de produtos e o restante do código...
-      try {
-        setLoading(true)
-        
-        // Verificar se já existe produto com o mesmo código de barras E mesma data de validade
-        const duplicateInList = products.find(
-          p => p.barcode === barcode && p.expiry_date === formattedDate && (editingIndex === null || products.indexOf(p) !== editingIndex)
-        )
-        
-        if (duplicateInList) {
-          setMessage({
-            type: 'error',
-            text: 'ATENÇÃO! Já existe um produto com mesmo código de barras e mesma data de validade na lista.'
-          })
-          setLoading(false)
-          return
-        }
-        
-        // Adicionar à lista de produtos recebidos
-        const category = categories.find(cat => cat.id === categoryId)
-        
-        if (editingIndex !== null) {
-          // Editando um produto existente na lista
-          const updatedProducts = [...products];
-          updatedProducts[editingIndex] = {
+      if (editingIndex !== null) {
+        // Editando um produto existente na lista
+        const updatedProducts = [...products];
+        updatedProducts[editingIndex] = {
+          name: productName,
+          barcode,
+          category: category?.name || 'Sem categoria',
+          expiry_date: formattedDate,
+          category_id: categoryId
+        };
+        setProducts(updatedProducts);
+        setEditingIndex(null);
+      } else {
+        // Adicionando novo produto
+        setProducts([
+          ...products, 
+          {
             name: productName,
             barcode,
             category: category?.name || 'Sem categoria',
             expiry_date: formattedDate,
             category_id: categoryId
-          };
-          setProducts(updatedProducts);
-          setEditingIndex(null);
-        } else {
-          // Adicionando novo produto
-          setProducts([
-            ...products, 
-            {
-              name: productName,
-              barcode,
-              category: category?.name || 'Sem categoria',
-              expiry_date: formattedDate,
-              category_id: categoryId
-            }
-          ]);
-        }
-        
-        // Limpar formulário
-        setBarcode('')
-        setProductName('')
-        setExpiryDateStr('')
-        setExistingProduct(null)
-        
-        setMessage({
-          type: 'success',
-          text: editingIndex !== null ? 'Produto atualizado com sucesso!' : 'Produto adicionado à lista!'
-        })
-        
-        // Voltar para o scanner após 1.5 segundos
-        setTimeout(() => {
-          setStep('scan')
-          setMessage(null)
-        }, 1500)
-        
-      } catch (error) {
-        console.error('Erro ao processar produto:', error)
-        setMessage({
-          type: 'error',
-          text: 'Erro ao processar produto. Tente novamente.'
-        })
-      } finally {
-        setLoading(false)
+          }
+        ]);
       }
+      
+      // Limpar formulário
+      setBarcode('')
+      setProductName('')
+      setExpiryDateStr('')
+      setExistingProduct(null)
+      
+      setMessage({
+        type: 'success',
+        text: editingIndex !== null ? 'Produto atualizado com sucesso!' : 'Produto adicionado à lista!'
+      })
+      
+      // Voltar para o scanner após 1.5 segundos
+      setTimeout(() => {
+        setStep('scan')
+        setMessage(null)
+      }, 1500)
+      
+    } catch (error) {
+      console.error('Erro ao processar produto:', error)
+      setMessage({
+        type: 'error',
+        text: 'Erro ao processar produto. Tente novamente.'
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -506,7 +545,7 @@ const MobileReceive = () => {
                     <button
                       onClick={handleManualCheck}
                       disabled={loading || !barcode.trim()}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700 disabled:bg-blue-300"
+                      className="bg-brmania-green text-white px-4 py-2 rounded-r-md hover:bg-green-700 disabled:bg-green-300"
                     >
                       <FaSearch className="text-lg" />
                     </button>
@@ -516,7 +555,7 @@ const MobileReceive = () => {
                 <div className="flex space-x-2">
                   <button
                     onClick={handleCameraButtonClick}
-                    className="flex-1 flex items-center justify-center bg-green-600 text-white p-3 rounded-md hover:bg-green-700"
+                    className="flex-1 flex items-center justify-center bg-brmania-green text-white p-3 rounded-md hover:bg-green-700"
                   >
                     <FaCamera className="mr-2" />
                     <span>Usar Câmera</span>
@@ -583,9 +622,34 @@ const MobileReceive = () => {
                     <input
                       type="text"
                       inputMode="numeric"
-                      pattern="[0-9]*"
                       value={expiryDateStr}
                       onChange={handleExpiryDateChange}
+                      onPaste={(e) => {
+                        // Permitir colar data e formatá-la automaticamente
+                        e.preventDefault();
+                        const pastedText = e.clipboardData.getData('text');
+                        // Remove caracteres não numéricos e aplica formatação
+                        const numbers = pastedText.replace(/[^\d]/g, '');
+                        
+                        if (numbers.length >= 6) {
+                          const day = numbers.slice(0, 2);
+                          const month = numbers.slice(2, 4);
+                          const year = numbers.slice(4, 6);
+                          setExpiryDateStr(`${day}/${month}/${year}`);
+                          
+                          // Atualiza o objeto de data
+                          try {
+                            const dateObj = new Date(parseInt(`20${year}`), parseInt(month) - 1, parseInt(day));
+                            if (!isNaN(dateObj.getTime())) {
+                              setExpiryDate(dateObj);
+                            }
+                          } catch (error) {
+                            console.error('Erro ao converter data colada:', error);
+                          }
+                        } else {
+                          setExpiryDateStr(numbers);
+                        }
+                      }}
                       placeholder="DD/MM/AA"
                       maxLength={8}
                       className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -615,7 +679,7 @@ const MobileReceive = () => {
                 <div className="flex space-x-3">
                   <button
                     type="submit"
-                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium flex justify-center items-center hover:bg-blue-700"
+                    className="flex-1 bg-brmania-green text-white py-2 rounded-lg font-medium flex justify-center items-center hover:bg-green-700"
                     disabled={loading}
                   >
                     {loading ? 'Processando...' : (
@@ -629,7 +693,7 @@ const MobileReceive = () => {
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="flex-1 bg-yellow-500 text-white py-2 rounded-lg font-medium flex justify-center items-center hover:bg-yellow-600"
+                    className="flex-1 bg-brmania-yellow text-brmania-dark py-2 rounded-lg font-medium flex justify-center items-center hover:bg-yellow-500"
                   >
                     <FaBackspace className="mr-2" /> Cancelar
                   </button>
