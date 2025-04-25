@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
-import { FaTimes } from 'react-icons/fa';
+import { FaTimes, FaSync } from 'react-icons/fa';
 
 interface BarcodeScannerProps {
   onBarcodeDetected: (barcode: string) => void;
@@ -14,62 +14,76 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
   const [error, setError] = useState<string | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
   const processingRef = useRef(false);
+  const lastProcessedTimestampRef = useRef(0);
 
   useEffect(() => {
-    // Configuração ultra rápida
+    // Configuração ultra rápida para todas as orientações
     const hints = new Map();
-    // Apenas os formatos essenciais para máxima velocidade
+    
+    // Formatos essenciais mantendo velocidade
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13,
       BarcodeFormat.EAN_8,
       BarcodeFormat.CODE_128,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
     ]);
     
-    // Configurações para máxima velocidade e flexibilidade
-    hints.set(DecodeHintType.TRY_HARDER, false);
+    // Ativar leitura em TODAS as orientações possíveis
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    // Detectar códigos de qualquer orientação (zxing usa TRY_HARDER para isso)
     hints.set(DecodeHintType.PURE_BARCODE, true);
     
     const codeReader = new BrowserMultiFormatReader(hints);
     let stopScanning = false;
-
-    // Função simplificada para escaneamento rápido 
+    
+    // Função de verificação turbinada
     const scanBarcode = () => {
-      if (stopScanning || !webcamRef.current || !isCameraReady || processingRef.current) return;
+      const now = Date.now();
+      // Limitar verificações a no máximo 30 por segundo (33ms)
+      if (stopScanning || !webcamRef.current || !isCameraReady || processingRef.current || 
+          now - lastProcessedTimestampRef.current < 33) return;
       
+      lastProcessedTimestampRef.current = now;
       processingRef.current = true;
       
       try {
-        // Obter screenshot em baixa qualidade para processamento rápido
+        // Configurar para baixíssima resolução = processamento ultra-rápido
         const imageSrc = webcamRef.current.getScreenshot();
         
         if (imageSrc) {
-          // Método direto para processamento rápido
+          // Método otimizado ao máximo
           const image = new Image();
-          image.src = imageSrc;
           
+          // Usar onload para evitar qualquer espera desnecessária
           image.onload = () => {
-            try {
-              // Processar imagem imediatamente
-              codeReader.decodeFromImage(image)
-                .then(result => {
-                  if (result && result.getText()) {
-                    // Código detectado!
-                    onBarcodeDetected(result.getText());
+            // Usar Promise.race para limitar o tempo de processamento
+            Promise.race([
+              codeReader.decodeFromImage(image),
+              new Promise((_, reject) => setTimeout(() => reject('timeout'), 150)) // Timeout de 150ms
+            ])
+              .then((result: any) => {
+                if (result && result.getText && result.getText()) {
+                  // Código detectado!
+                  const text = result.getText();
+                  if (text && text.length > 3) { // Verificação mínima
+                    onBarcodeDetected(text);
                     stopScanning = true;
                   }
-                })
-                .catch(() => {
-                  // Ignorar erros, continuar escaneamento
-                })
-                .finally(() => {
-                  processingRef.current = false;
-                });
-            } catch (e) {
-              // Apenas liberar o processamento
-              processingRef.current = false;
-            }
+                }
+              })
+              .catch(() => {
+                // Ignorar erros, continuar escaneamento
+              })
+              .finally(() => {
+                processingRef.current = false;
+              });
           };
           
+          // Configurar para carregamento imediato
+          image.src = imageSrc;
+          
+          // Tratamento de erro direto
           image.onerror = () => {
             processingRef.current = false;
           };
@@ -82,12 +96,12 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
     };
 
     if (isCameraReady) {
-      // Escaneamento agressivo - múltiplas estratégias em paralelo
+      // Escaneamento extremamente agressivo - estratégias paralelas
       
-      // Estratégia 1: Intervalos curtos e frequentes
-      scanIntervalRef.current = window.setInterval(scanBarcode, 100);
+      // 1: Intervalos ultra curtos (60ms = ~16 tentativas/segundo)
+      scanIntervalRef.current = window.setInterval(scanBarcode, 60);
       
-      // Estratégia 2: Processamento via frame animation
+      // 2: Processamento via requestAnimationFrame (tão rápido quanto possível)
       const animFrame = () => {
         if (!stopScanning) {
           scanBarcode();
@@ -118,14 +132,14 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden w-11/12 max-w-sm">
-        {/* Cabeçalho simplificado */}
-        <div className="flex justify-between items-center p-2 bg-blue-600 text-white">
-          <h3 className="text-base font-medium">Scanner Rápido</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden w-full max-w-sm mx-4">
+        {/* Cabeçalho mínimo */}
+        <div className="flex justify-between items-center p-1 bg-blue-600 text-white">
+          <h3 className="text-sm font-medium px-1">Scanner Rápido</h3>
           <button 
             onClick={onClose}
-            className="text-white p-1 rounded-full hover:bg-blue-700 transition-colors"
+            className="text-white p-1 rounded-full hover:bg-blue-700"
             aria-label="Fechar"
           >
             <FaTimes />
@@ -133,7 +147,7 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
         </div>
 
         {error ? (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-2 text-sm">
             {error}
           </div>
         ) : (
@@ -142,40 +156,39 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
               ref={webcamRef}
               audio={false}
               screenshotFormat="image/jpeg"
-              screenshotQuality={0.5} // Reduzir ainda mais a qualidade para velocidade máxima
+              screenshotQuality={0.3} // Qualidade extremamente baixa para máximo desempenho
               videoConstraints={{
                 facingMode: 'environment',
-                width: { min: 320, ideal: 640, max: 1280 }, // Reduzir resolução para processamento mais rápido
-                height: { min: 240, ideal: 480, max: 720 },
+                width: { min: 240, ideal: 480, max: 640 }, // Resolução mínima para máxima velocidade
+                height: { min: 180, ideal: 360, max: 480 },
                 aspectRatio: 4/3,
-                frameRate: { ideal: 30, min: 15 },
+                frameRate: { ideal: 30, min: 20 }, // Manter alto framerate
               }}
               onUserMedia={handleUserMedia}
               onUserMediaError={handleUserMediaError}
-              className="w-full h-56 object-cover"
+              className="w-full h-52 object-cover"
               mirrored={false}
             />
             
-            {/* Sem área de foco específica - detecção em qualquer lugar */}
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-white text-sm bg-black bg-opacity-50 px-2 py-1 rounded">
-                  Aponte para qualquer código de barras
+            {/* Interface mínima, indicando todas as direções possíveis */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="bg-black bg-opacity-60 px-3 py-1 rounded-full flex items-center">
+                <FaSync className="text-white animate-spin mr-1" />
+                <p className="text-white text-xs">
+                  Qualquer posição e orientação
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        <div className="p-2 bg-gray-50">
-          <div className="flex justify-center">
-            <button 
-              onClick={onClose}
-              className="bg-gray-200 text-gray-800 px-4 py-1 rounded text-sm font-medium hover:bg-gray-300 transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
+        <div className="p-1 bg-gray-50 flex justify-center">
+          <button 
+            onClick={onClose}
+            className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs"
+          >
+            Cancelar
+          </button>
         </div>
       </div>
     </div>
