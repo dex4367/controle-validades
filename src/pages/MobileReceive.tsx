@@ -15,8 +15,10 @@ import {
   FaTrash, 
   FaBackspace,
   FaSearch,
-  FaBoxOpen
+  FaBoxOpen,
+  FaCamera
 } from 'react-icons/fa'
+import BarcodeScanner from '../components/BarcodeScanner'
 
 interface AnimationState {
   firstIndex: number;
@@ -35,7 +37,7 @@ const MobileReceive = () => {
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
   const [existingProduct, setExistingProduct] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<'scan' | 'form' | 'edit'>('scan')
+  const [step, setStep] = useState<'scan' | 'form' | 'edit' | 'camera'>('scan')
   const [products, setProducts] = useState<any[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [isSwapping, setIsSwapping] = useState(false)
@@ -391,6 +393,20 @@ const MobileReceive = () => {
     }
   }
 
+  const handleBarcodeScan = (barcode: string) => {
+    setBarcode(barcode);
+    checkProduct(barcode);
+  }
+
+  const handleScanError = (error: unknown) => {
+    console.error('Erro no scanner:', error);
+    setMessage({
+      type: 'error',
+      text: 'Erro ao acessar a câmera. Verifique as permissões.'
+    });
+    setStep('scan');
+  }
+
   return (
     <div className="min-h-screen bg-brmania-light">
       <header className="bg-brmania-green text-white p-4 shadow-md">
@@ -446,9 +462,36 @@ const MobileReceive = () => {
                       {loading ? <span className="animate-pulse">...</span> : <FaSearch />}
                     </button>
                   </div>
+                  
+                  <button
+                    onClick={() => setStep('camera')}
+                    className="w-full bg-brmania-dark text-white p-3 rounded-lg flex items-center justify-center"
+                  >
+                    <FaCamera className="mr-2" /> Escanear código com a câmera
+                  </button>
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {step === 'camera' && (
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden p-6">
+            <h2 className="text-lg font-semibold text-brmania-dark mb-4 flex items-center">
+              <FaCamera className="mr-2 text-brmania-green" /> Scanner de Código de Barras
+            </h2>
+            
+            <BarcodeScanner 
+              onScan={handleBarcodeScan} 
+              onError={handleScanError} 
+            />
+            
+            <button
+              onClick={() => setStep('scan')}
+              className="w-full mt-4 bg-brmania-dark text-white p-3 rounded-lg"
+            >
+              Voltar para entrada manual
+            </button>
           </div>
         )}
 
