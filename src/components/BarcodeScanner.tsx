@@ -47,7 +47,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
     // Iniciar o scanner automaticamente após um breve atraso para permitir carregamento
     setTimeout(() => {
       startScanner();
-    }, 500);
+    }, 1000);
     
     // Limpar recursos quando o componente desmontar
     return () => {
@@ -71,10 +71,10 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
       const constraints = {
         video: {
           facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 },
-          aspectRatio: { ideal: 1.333333 } // 4:3
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 60 },
+          aspectRatio: { ideal: 4/3 } // 4:3
         }
       };
       
@@ -150,20 +150,20 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
           {scanning && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               {/* Moldura do scanner com efeitos visuais de scanner profissional */}
-              <div className="relative w-72 h-72 border-2 border-brmania-green rounded-lg">
+              <div className="relative w-[90%] h-24 border-2 border-[#009A3D] rounded-lg">
                 {/* Cantos da moldura para dar efeito de scanner */}
-                <div className="absolute w-8 h-8 top-0 left-0 border-t-4 border-l-4 border-brmania-green rounded-tl"></div>
-                <div className="absolute w-8 h-8 top-0 right-0 border-t-4 border-r-4 border-brmania-green rounded-tr"></div>
-                <div className="absolute w-8 h-8 bottom-0 left-0 border-b-4 border-l-4 border-brmania-green rounded-bl"></div>
-                <div className="absolute w-8 h-8 bottom-0 right-0 border-b-4 border-r-4 border-brmania-green rounded-br"></div>
+                <div className="absolute w-8 h-8 top-0 left-0 border-t-4 border-l-4 border-[#009A3D] rounded-tl"></div>
+                <div className="absolute w-8 h-8 top-0 right-0 border-t-4 border-r-4 border-[#009A3D] rounded-tr"></div>
+                <div className="absolute w-8 h-8 bottom-0 left-0 border-b-4 border-l-4 border-[#009A3D] rounded-bl"></div>
+                <div className="absolute w-8 h-8 bottom-0 right-0 border-b-4 border-r-4 border-[#009A3D] rounded-br"></div>
                 
                 {/* Linha de escaneamento animada */}
-                <div className="absolute top-0 left-0 right-0 h-1 bg-brmania-green opacity-80 animate-scan"></div>
+                <div className="absolute top-0 left-0 right-0 h-1 bg-[#009A3D] opacity-80 animate-scan"></div>
                 
                 {/* Mensagem de ajuda */}
                 <div className="absolute -bottom-10 left-0 right-0 text-center">
                   <span className="bg-black/70 text-white px-4 py-2 rounded-full text-sm inline-block">
-                    Posicione o código de barras dentro do quadro
+                    Posicione o código de barras dentro do retângulo
                   </span>
                 </div>
               </div>
@@ -203,7 +203,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
           onClick={resetScanner}
           disabled={scanning && !barcode}
           className={`flex-1 py-2 px-4 rounded-lg ${!scanning || barcode
-            ? 'bg-brmania-green text-white hover:bg-brmania-green/90' 
+            ? 'bg-[#009A3D] text-white hover:bg-[#008A35]' 
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
         >
           {barcode ? 'Escanear Novamente' : 'Iniciar Scanner'}
