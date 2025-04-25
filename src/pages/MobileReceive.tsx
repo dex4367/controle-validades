@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { getProductByBarcode, createProduct, getCategories, getProductNameSuggestions, saveProductNameToHistory } from '../services/supabase'
+import { getProductByBarcode, createProduct, getCategories, getProductNameSuggestions, saveProductNameToHistory, getProductHistoryByBarcode } from '../services/supabase'
 // Removendo a importação do DatePicker que não será mais necessária
 // import DatePicker from 'react-datepicker'
 // import '../styles/datepicker.css'
@@ -87,6 +87,7 @@ const MobileReceive = () => {
       console.log('📦 Resultado da busca:', product ? 'Produto encontrado' : 'Produto não encontrado');
       
       if (product) {
+        // Produto encontrado no banco de dados ativo
         setExistingProduct(product)
         setProductName(product.name)
         setCategoryId(product.category_id)
@@ -97,9 +98,25 @@ const MobileReceive = () => {
           text: `Produto já cadastrado: ${product.name}`
         })
       } else {
-        setExistingProduct(null)
-        setProductName(''); // Limpar nome para produto novo
-        setMessage(null)
+        // Produto não encontrado no banco ativo, verificar no histórico
+        const historicalProduct = await getProductHistoryByBarcode(barcodeValue);
+        
+        if (historicalProduct) {
+          // Produto encontrado no histórico (foi excluído anteriormente)
+          setExistingProduct(null)
+          setProductName(historicalProduct.name)
+          // Categoria precisa ser selecionada manualmente já que não temos essa info no histórico
+          
+          setMessage({
+            type: 'success',
+            text: `Produto encontrado no histórico: ${historicalProduct.name}`
+          })
+        } else {
+          // Produto realmente novo
+          setExistingProduct(null)
+          setProductName('') // Limpar nome para produto novo
+          setMessage(null)
+        }
       }
       
       // Definir data de validade padrão como vazia para o novo sistema
@@ -811,6 +828,14 @@ const MobileReceive = () => {
                         <button 
                           onClick={() => {
                             const updatedProducts = [...products];
+                            const productToRemove = updatedProducts[index];
+                            
+                            // Salvar o nome do produto no histórico antes de remover
+                            if (productToRemove.name && productToRemove.barcode) {
+                              saveProductNameToHistory(productToRemove.name, productToRemove.barcode)
+                                .catch(err => console.error('Erro ao salvar nome do produto excluído:', err));
+                            }
+                            
                             updatedProducts.splice(index, 1);
                             setProducts(updatedProducts);
                           }}

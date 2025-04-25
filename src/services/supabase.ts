@@ -307,4 +307,25 @@ export const deleteCategory = async (id: number) => {
     console.error(`Erro ao excluir categoria ${id}:`, error)
     throw error
   }
+}
+
+// Buscar histórico de produtos por código de barras
+export const getProductHistoryByBarcode = async (barcode: string): Promise<ProductNameHistory | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('product_names_history')
+      .select('*')
+      .eq('barcode', barcode)
+      .limit(1);
+    
+    if (error) {
+      console.error(`Erro ao buscar histórico de produto pelo código de barras ${barcode}:`, error);
+      return null;
+    }
+    
+    return data && data.length > 0 ? data[0] : null;
+  } catch (error) {
+    console.error(`Erro ao processar busca de histórico por código de barras ${barcode}:`, error);
+    return null;
+  }
 } 
