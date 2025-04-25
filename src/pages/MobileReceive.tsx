@@ -452,19 +452,19 @@ const MobileReceive = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-800">
-      <header className="bg-teal-700 text-white p-4 shadow-md">
+    <div className="min-h-screen bg-brmania-light">
+      <header className="bg-brmania-green text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold">Escanear Produto</h1>
           {step === 'scan' && products.length > 0 && (
-            <span className="bg-yellow-400 text-gray-900 px-3 py-1 rounded-full text-sm font-semibold">
+            <span className="bg-brmania-yellow text-brmania-dark px-3 py-1 rounded-full text-sm font-semibold">
               {products.length} {products.length === 1 ? 'item' : 'itens'}
             </span>
           )}
           {step !== 'scan' && (
             <button 
               onClick={() => setStep('scan')}
-              className="text-white bg-teal-800 hover:bg-teal-900 rounded-full w-8 h-8 flex items-center justify-center"
+              className="text-white bg-brmania-dark/20 hover:bg-brmania-dark/30 rounded-full w-8 h-8 flex items-center justify-center"
             >
               ×
             </button>
@@ -474,7 +474,7 @@ const MobileReceive = () => {
 
       <main className="container mx-auto p-4">
         {step === 'scan' && (
-          <div className="bg-gray-700 rounded-lg shadow-lg overflow-hidden">
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
             {scanning ? (
               <div className="relative">
                 <div className="relative">
@@ -482,9 +482,9 @@ const MobileReceive = () => {
                     ref={videoRef}
                     className="w-full h-80 object-cover"
                   ></video>
-                  <div className="absolute inset-0 border-2 border-yellow-400 box-content pointer-events-none">
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-2 border-yellow-400 rounded-lg"></div>
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-2 border-yellow-400 rounded-lg opacity-50 animate-pulse"></div>
+                  <div className="absolute inset-0 border-2 border-brmania-yellow box-content pointer-events-none">
+                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-2 border-brmania-yellow rounded-lg"></div>
+                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-2 border-brmania-yellow rounded-lg opacity-50 animate-pulse"></div>
                   </div>
                 </div>
                 <button
@@ -495,31 +495,31 @@ const MobileReceive = () => {
                 </button>
               </div>
             ) : (
-              <div className="p-4">
-                <div className="bg-gray-600 p-8 rounded-lg flex flex-col items-center justify-center">
-                  <FaBarcode className="text-7xl text-gray-400 mb-4" />
-                  <p className="text-white text-center mb-4">Câmera não disponível</p>
+              <div className="p-6">
+                <div className="bg-brmania-light p-8 rounded-lg flex flex-col items-center justify-center">
+                  <FaBarcode className="text-7xl text-brmania-green mb-4" />
+                  <p className="text-brmania-dark text-center mb-4">Câmera não disponível</p>
                   <button
                     onClick={startScan}
-                    className="bg-teal-600 text-white py-3 px-6 rounded-lg font-medium flex justify-center items-center shadow-lg mb-4"
+                    className="bg-brmania-green text-white py-3 px-6 rounded-lg font-medium flex justify-center items-center shadow-lg mb-4"
                   >
                     <FaCamera className="mr-2" /> Abrir Câmera
                   </button>
                 </div>
 
                 <div className="mt-6">
-                  <p className="text-white text-center mb-4">Não está funcionando? Digite o código manualmente:</p>
+                  <p className="text-brmania-dark text-center mb-4">Não está funcionando? Digite o código manualmente:</p>
                   <div className="flex mb-4">
                     <input
                       type="text"
                       value={barcode}
                       onChange={handleBarcodeInput}
                       placeholder="Digite o código de barras"
-                      className="flex-1 p-3 border border-gray-500 bg-gray-800 text-white rounded-l-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      className="flex-1 p-3 border border-gray-300 bg-white text-brmania-dark rounded-l-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
                     />
                     <button
                       onClick={handleManualCheck}
-                      className="bg-teal-600 text-white p-3 rounded-r-lg"
+                      className="bg-brmania-green text-white p-3 rounded-r-lg"
                     >
                       <FaSearch />
                     </button>
@@ -530,7 +530,7 @@ const MobileReceive = () => {
                   <div className="mt-6">
                     <button
                       onClick={handleFinishReceiving}
-                      className="w-full bg-yellow-400 text-gray-900 py-3 px-4 rounded-lg font-medium flex justify-center items-center shadow-lg"
+                      className="w-full bg-brmania-yellow text-brmania-dark py-3 px-4 rounded-lg font-medium flex justify-center items-center shadow-lg"
                     >
                       <FaSave className="mr-2" /> Finalizar Recebimento ({products.length})
                     </button>
@@ -542,11 +542,11 @@ const MobileReceive = () => {
         )}
 
         {step === 'form' && (
-          <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+          <div className="bg-white rounded-lg shadow-md p-6 mb-4">
+            <h2 className="text-lg font-semibold text-brmania-dark mb-4 flex items-center">
               {editingIndex !== null ? 
-                <><FaEdit className="mr-2 text-teal-600" /> Editar Produto</> : 
-                <><FaBoxOpen className="mr-2 text-teal-600" /> Novo Produto</>
+                <><FaEdit className="mr-2 text-brmania-green" /> Editar Produto</> : 
+                <><FaBoxOpen className="mr-2 text-brmania-green" /> Novo Produto</>
               }
             </h2>
 
@@ -569,7 +569,7 @@ const MobileReceive = () => {
                   type="text"
                   value={barcode}
                   onChange={handleBarcodeInput}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
                   readOnly={existingProduct !== null}
                 />
               </div>
@@ -640,9 +640,9 @@ const MobileReceive = () => {
         )}
 
         {products.length > 0 && step === 'scan' && (
-          <div className="bg-white rounded-lg shadow-md p-4 mt-4">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <FaBoxOpen className="mr-2 text-teal-600" /> Produtos Recebidos
+          <div className="bg-white rounded-lg shadow-md p-6 mt-4">
+            <h2 className="text-lg font-semibold text-brmania-dark mb-4 flex items-center">
+              <FaBoxOpen className="mr-2 text-brmania-green" /> Produtos Recebidos
             </h2>
             
             <ul className="divide-y divide-gray-200">
@@ -653,9 +653,9 @@ const MobileReceive = () => {
                 >
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="font-medium text-gray-800">{product.name}</p>
+                      <p className="font-medium text-brmania-dark">{product.name}</p>
                       <p className="text-sm text-gray-500">
-                        <span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs mr-2">
+                        <span className="inline-block bg-brmania-yellow bg-opacity-30 text-brmania-dark px-2 py-0.5 rounded-full text-xs mr-2">
                           {product.category}
                         </span>
                         Venc: {new Date(product.expiry_date).toLocaleDateString()}
@@ -668,7 +668,7 @@ const MobileReceive = () => {
                     <div className="flex space-x-2">
                       <button 
                         onClick={() => handleEditProduct(index)}
-                        className="p-2 rounded-full text-yellow-500 hover:bg-yellow-100"
+                        className="p-2 rounded-full text-brmania-yellow hover:bg-yellow-100"
                       >
                         <FaEdit />
                       </button>
