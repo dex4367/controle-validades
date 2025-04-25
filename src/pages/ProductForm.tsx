@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import DatePicker from 'react-datepicker'
 // Usando o arquivo CSS personalizado
@@ -10,7 +10,8 @@ import {
   getCategories, 
   createCategory,
   uploadProductImage,
-  getProductsByBarcode
+  getProductsByBarcode,
+  getProductNameSuggestions
 } from '../services/supabase'
 
 const ProductForm = () => {
@@ -28,6 +29,9 @@ const ProductForm = () => {
   const [existingBarcodeProducts, setExistingBarcodeProducts] = useState<any[]>([])
   const [showExistingProducts, setShowExistingProducts] = useState(false)
   const [expiryDate, setExpiryDate] = useState<Date>(new Date())
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([])
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false)
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Estado do produto
   const [product, setProduct] = useState({
@@ -37,6 +41,61 @@ const ProductForm = () => {
     expiry_date: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD
     image_url: ''
   })
+
+  // Nova função para buscar sugestões de nomes
+  const fetchProductNameSuggestions = async (query: string) => {
+    if (query.length < 2) return;
+    
+    try {
+      const suggestions = await getProductNameSuggestions(query);
+      setNameSuggestions(suggestions);
+      setShowNameSuggestions(suggestions.length > 0);
+    } catch (error) {
+      console.error('Erro ao buscar sugestões de nomes:', error);
+    }
+  }
+
+  const handleBarcodeSearch = async (barcodeValue?: string) => {
+    const barcode = barcodeValue || product.barcode
+    
+    if (!barcode) {
+      alert('Digite um código de barras para buscar')
+      return
+    }
+    
+    try {
+      setLoading(true)
+      // Buscar todos os produtos com este código de barras
+      const products = await getProductsByBarcode(barcode)
+      
+      if (products && products.length > 0) {
+        setExistingBarcodeProducts(products)
+        setShowExistingProducts(true)
+        
+        // Preencher os dados do primeiro produto encontrado
+        const firstProduct = products[0]
+        setProduct({
+          ...product,
+          name: firstProduct.name,
+          category_id: firstProduct.category_id,
+          // Não alterar a data de validade
+          image_url: firstProduct.image_url || ''
+        })
+        
+        if (firstProduct.image_url) {
+          setPreviewImage(firstProduct.image_url)
+        }
+      } else {
+        setExistingBarcodeProducts([])
+        setShowExistingProducts(false)
+        alert('Nenhum produto encontrado com este código de barras')
+      }
+    } catch (error) {
+      console.error('Erro ao buscar produto por código de barras:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     loadCategories()
@@ -52,6 +111,18 @@ const ProductForm = () => {
       }
     }
   }, [id, location.state])
+
+  // Nova função para selecionar uma sugestão de nome
+  const handleSelectNameSuggestion = (name: string) => {
+    setProduct(prev => ({ ...prev, name }));
+    setNameSuggestions([]);
+    setShowNameSuggestions(false);
+    
+    // Focar no próximo campo após selecionar um nome
+    if (nameInputRef.current) {
+      nameInputRef.current.blur();
+    }
+  }
 
   const loadCategories = async () => {
     try {
@@ -107,6 +178,14 @@ const ProductForm = () => {
       setExistingBarcodeProducts([])
       setShowExistingProducts(false)
     }
+
+    // Buscar sugestões quando o nome é digitado
+    if (name === 'name' && value.length >= 2) {
+      fetchProductNameSuggestions(value);
+    } else if (name === 'name') {
+      setNameSuggestions([]);
+      setShowNameSuggestions(false);
+    }
   }
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -152,48 +231,6 @@ const ProductForm = () => {
       setPreviewImage(reader.result as string)
     }
     reader.readAsDataURL(file)
-  }
-
-  const handleBarcodeSearch = async (barcodeValue?: string) => {
-    const barcode = barcodeValue || product.barcode
-    
-    if (!barcode) {
-      alert('Digite um código de barras para buscar')
-      return
-    }
-    
-    try {
-      setLoading(true)
-      // Buscar todos os produtos com este código de barras
-      const products = await getProductsByBarcode(barcode)
-      
-      if (products && products.length > 0) {
-        setExistingBarcodeProducts(products)
-        setShowExistingProducts(true)
-        
-        // Preencher os dados do primeiro produto encontrado
-        const firstProduct = products[0]
-        setProduct({
-          ...product,
-          name: firstProduct.name,
-          category_id: firstProduct.category_id,
-          // Não alterar a data de validade
-          image_url: firstProduct.image_url || ''
-        })
-        
-        if (firstProduct.image_url) {
-          setPreviewImage(firstProduct.image_url)
-        }
-      } else {
-        setExistingBarcodeProducts([])
-        setShowExistingProducts(false)
-        alert('Nenhum produto encontrado com este código de barras')
-      }
-    } catch (error) {
-      console.error('Erro ao buscar produto por código de barras:', error)
-    } finally {
-      setLoading(false)
-    }
   }
 
   const handleSelectExistingProduct = (selectedProduct: any) => {
@@ -280,15 +317,41 @@ const ProductForm = () => {
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                   Nome do Produto *
                 </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  required
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  value={product.name}
-                  onChange={handleChange}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    ref={nameInputRef}
+                    required
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={product.name}
+                    onChange={handleChange}
+                    autoComplete="off"
+                    onBlur={() => {
+                      // Pequeno delay para permitir clique na sugestão
+                      setTimeout(() => setShowNameSuggestions(false), 200);
+                    }}
+                    onFocus={() => {
+                      if (product.name.length >= 2 && nameSuggestions.length > 0) {
+                        setShowNameSuggestions(true);
+                      }
+                    }}
+                  />
+                  {showNameSuggestions && nameSuggestions.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-auto">
+                      {nameSuggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => handleSelectNameSuggestion(suggestion)}
+                        >
+                          {suggestion}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div>

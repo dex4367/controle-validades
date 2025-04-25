@@ -20,6 +20,14 @@ export interface Product {
   }
 }
 
+// Tipo para histórico de nomes de produtos
+export interface ProductNameHistory {
+  id: number
+  name: string
+  barcode?: string
+  created_at: string
+}
+
 // ========== PRODUTOS ==========
 
 // Buscar todos os produtos
@@ -129,16 +137,89 @@ export const updateProduct = async (id: number, productData: Partial<Product>): 
   return data![0]
 }
 
-// Excluir um produto
+// Salvar nome do produto no histórico
+export const saveProductNameToHistory = async (name: string, barcode?: string): Promise<void> => {
+  try {
+    // Verificar se o nome já existe no histórico
+    const { data: existingNames } = await supabase
+      .from('product_names_history')
+      .select('name')
+      .eq('name', name)
+      .limit(1);
+
+    // Se o nome já existe, não é necessário salvar novamente
+    if (existingNames && existingNames.length > 0) {
+      return;
+    }
+    
+    // Salvar o nome no histórico
+    const { error } = await supabase
+      .from('product_names_history')
+      .insert([{ name, barcode }]);
+    
+    if (error) {
+      console.error('Erro ao salvar nome do produto no histórico:', error);
+    }
+  } catch (error) {
+    console.error('Erro ao processar histórico de nomes:', error);
+  }
+}
+
+// Buscar histórico de nomes de produtos para autocomplete
+export const getProductNameSuggestions = async (query: string): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('product_names_history')
+      .select('name')
+      .ilike('name', `%${query}%`)
+      .order('name')
+      .limit(10);
+    
+    if (error) {
+      console.error('Erro ao buscar sugestões de nomes de produtos:', error);
+      return [];
+    }
+    
+    return data ? data.map(item => item.name) : [];
+  } catch (error) {
+    console.error('Erro ao buscar sugestões de nomes:', error);
+    return [];
+  }
+}
+
+// Excluir um produto (modificada para salvar o nome antes)
 export const deleteProduct = async (id: number): Promise<void> => {
-  const { error } = await supabase
-    .from('products')
-    .delete()
-    .eq('id', id)
-  
-  if (error) {
-    console.error(`Erro ao excluir produto ${id}:`, error)
-    throw error
+  try {
+    // Primeiro, obtém os dados do produto
+    const { data: product, error: fetchError } = await supabase
+      .from('products')
+      .select('name, barcode')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) {
+      console.error(`Erro ao buscar produto ${id} para exclusão:`, fetchError);
+      throw fetchError;
+    }
+    
+    // Salva o nome no histórico
+    if (product) {
+      await saveProductNameToHistory(product.name, product.barcode);
+    }
+    
+    // Exclui o produto
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error(`Erro ao excluir produto ${id}:`, error);
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Erro no processo de exclusão do produto ${id}:`, error);
+    throw error;
   }
 }
 

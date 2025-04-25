@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { getProductByBarcode, createProduct, getCategories } from '../services/supabase'
+import { getProductByBarcode, createProduct, getCategories, getProductNameSuggestions, saveProductNameToHistory } from '../services/supabase'
 // Removendo a importação do DatePicker que não será mais necessária
 // import DatePicker from 'react-datepicker'
 // import '../styles/datepicker.css'
@@ -38,7 +38,10 @@ const MobileReceive = () => {
   const [existingProduct, setExistingProduct] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'scan' | 'form' | 'edit'>('scan')
-  const [products, setProducts] = useState<any[]>([])
+  const [products, setProducts] = useState<any[]>(() => {
+    const savedProducts = localStorage.getItem('mobileReceiveProducts');
+    return savedProducts ? JSON.parse(savedProducts) : [];
+  })
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [isSwapping, setIsSwapping] = useState(false)
   const [animation, setAnimation] = useState<AnimationState>({
@@ -48,11 +51,17 @@ const MobileReceive = () => {
     direction: 'up'
   })
   const [isCameraOpen, setIsCameraOpen] = useState(false)
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([])
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false)
 
   useEffect(() => {
     // Buscar categorias no primeiro carregamento
     loadCategories()
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem('mobileReceiveProducts', JSON.stringify(products));
+  }, [products]);
 
   const loadCategories = async () => {
     try {
@@ -188,6 +197,37 @@ const MobileReceive = () => {
     }
   };
 
+  const fetchProductNameSuggestions = async (query: string) => {
+    if (query.length < 2) return;
+    
+    try {
+      const suggestions = await getProductNameSuggestions(query);
+      setNameSuggestions(suggestions);
+      setShowNameSuggestions(suggestions.length > 0);
+    } catch (error) {
+      console.error('Erro ao buscar sugestões de nomes:', error);
+    }
+  }
+
+  const handleProductNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setProductName(value);
+    
+    // Buscar sugestões quando o nome é digitado
+    if (value.length >= 2) {
+      fetchProductNameSuggestions(value);
+    } else {
+      setNameSuggestions([]);
+      setShowNameSuggestions(false);
+    }
+  }
+
+  const handleSelectNameSuggestion = (name: string) => {
+    setProductName(name);
+    setNameSuggestions([]);
+    setShowNameSuggestions(false);
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -269,6 +309,9 @@ const MobileReceive = () => {
         setLoading(false)
         return
       }
+      
+      // Salvar o nome no histórico, mesmo que não salve o produto ainda
+      await saveProductNameToHistory(productName, barcode);
       
       // Adicionar à lista de produtos recebidos
       const category = categories.find(cat => cat.id === categoryId)
@@ -451,6 +494,9 @@ const MobileReceive = () => {
 
       // Limpar a lista após salvar
       setProducts([]);
+      // Limpar também no localStorage
+      localStorage.removeItem('mobileReceiveProducts');
+      
       setBarcode('');
       setProductName('');
       
@@ -596,13 +642,38 @@ const MobileReceive = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto</label>
-                  <input
-                    type="text"
-                    value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={productName}
+                      onChange={handleProductNameChange}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                      autoComplete="off"
+                      onBlur={() => {
+                        // Pequeno delay para permitir clique na sugestão
+                        setTimeout(() => setShowNameSuggestions(false), 200);
+                      }}
+                      onFocus={() => {
+                        if (productName.length >= 2 && nameSuggestions.length > 0) {
+                          setShowNameSuggestions(true);
+                        }
+                      }}
+                    />
+                    {showNameSuggestions && nameSuggestions.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-auto">
+                        {nameSuggestions.map((suggestion, index) => (
+                          <div
+                            key={index}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => handleSelectNameSuggestion(suggestion)}
+                          >
+                            {suggestion}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
   
                 <div>
