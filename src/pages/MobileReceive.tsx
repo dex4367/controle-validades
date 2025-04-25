@@ -93,15 +93,50 @@ const MobileReceive = () => {
     }
   }
 
+  // Função para solicitar permissão da câmera explicitamente
+  const requestCameraPermission = async (): Promise<boolean> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Liberando a stream após obter permissão
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (err) {
+      console.error('Erro ao solicitar permissão da câmera:', err);
+      
+      // Verificar se o erro é de permissão negada
+      if (err instanceof DOMException && 
+         (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+        setMessage({
+          type: 'error',
+          text: 'Permissão para acessar a câmera foi negada. Por favor, permita o acesso nas configurações do seu navegador.'
+        });
+      }
+      return false;
+    }
+  }
+
   const startScan = async () => {
     if (!codeReader.current || !videoRef.current) return
+    
+    // Verificar/solicitar permissão primeiro
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      return; // Não prossegue se não tiver permissão
+    }
     
     try {
       setScanning(true)
       setMessage(null)
       
-      await codeReader.current.decodeFromVideoDevice(
-        null, // Usando a câmera padrão (em vez de undefined)
+      // Opções para a câmera móvel - preferir câmera traseira
+      const constraints = {
+        facingMode: "environment", // Usar câmera traseira
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      };
+      
+      await codeReader.current.decodeFromConstraints(
+        { video: constraints },
         videoRef.current,
         (result, error) => {
           if (result) {
@@ -123,6 +158,52 @@ const MobileReceive = () => {
         text: 'Não foi possível acessar a câmera. Verifique as permissões.'
       })
       setScanning(false)
+      
+      // Tente uma alternativa se a primeira abordagem falhar
+      try {
+        const deviceId = await getBackCameraId();
+        if (deviceId && codeReader.current && videoRef.current) {
+          await codeReader.current.decodeFromVideoDevice(
+            deviceId, 
+            videoRef.current,
+            (result, error) => {
+              if (result) {
+                const barcodeValue = result.getText()
+                setBarcode(barcodeValue)
+                stopScan()
+                checkProduct(barcodeValue)
+              }
+              if (error && !(error instanceof TypeError)) {
+                console.error('Erro durante a leitura (segunda tentativa):', error)
+              }
+            }
+          );
+          setScanning(true);
+          setMessage(null);
+        }
+      } catch (alternativeErr) {
+        console.error('Erro alternativo:', alternativeErr);
+      }
+    }
+  }
+
+  // Função auxiliar para obter o ID da câmera traseira
+  const getBackCameraId = async (): Promise<string | null> => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      
+      // Em dispositivos móveis, geralmente a câmera traseira é a última na lista
+      // ou tem "back" no rótulo
+      const backCamera = videoDevices.find(device => 
+        device.label.toLowerCase().includes('back') || 
+        device.label.toLowerCase().includes('traseira')
+      ) || videoDevices[videoDevices.length - 1];
+      
+      return backCamera?.deviceId || null;
+    } catch (error) {
+      console.error('Erro ao enumerar dispositivos:', error);
+      return null;
     }
   }
 
@@ -480,11 +561,19 @@ const MobileReceive = () => {
                 <div className="relative">
                   <video
                     ref={videoRef}
-                    className="w-full h-80 object-cover"
+                    className="w-full h-80 object-cover aspect-[4/3]"
+                    playsInline={true}
+                    autoPlay={true}
+                    muted={true}
                   ></video>
                   <div className="absolute inset-0 border-2 border-brmania-yellow box-content pointer-events-none">
                     <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-2 border-brmania-yellow rounded-lg"></div>
                     <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-2 border-brmania-yellow rounded-lg opacity-50 animate-pulse"></div>
+                  </div>
+                  <div className="absolute bottom-16 left-0 right-0 text-center">
+                    <span className="bg-black/50 text-white px-4 py-2 rounded-full text-sm inline-block">
+                      Posicione o código de barras dentro do quadro
+                    </span>
                   </div>
                 </div>
                 <button
