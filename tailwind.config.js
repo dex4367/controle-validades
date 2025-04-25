@@ -34,16 +34,16 @@ export default {
           '20%, 40%, 60%, 80%': { transform: 'translateX(2px)' }
         },
         'scan-line': {
-          '0%': { transform: 'translateY(-100%)' },
-          '50%': { transform: 'translateY(100%)' },
-          '100%': { transform: 'translateY(-100%)' }
+          '0%': { top: '0%' },
+          '50%': { top: '100%' },
+          '100%': { top: '0%' }
         }
       },
       animation: {
         highlight: 'highlight 1.5s ease-in-out',
         'highlight-subtle': 'highlight-subtle 1.5s ease-in-out',
         shake: 'shake 0.5s ease-in-out',
-        'scan-line': 'scan-line 2s ease-in-out infinite'
+        'scan-line': 'scan-line 3s linear infinite'
       }
     },
   },

@@ -166,12 +166,12 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden w-full max-w-sm mx-4">
-        {/* Cabeçalho no estilo BR Mania */}
-        <div className="flex justify-between items-center p-2 bg-red-600 text-white">
+        {/* Cabeçalho no estilo BR Mania - Verde */}
+        <div className="flex justify-between items-center p-2 bg-brmania-green text-white">
           <h3 className="text-sm font-medium px-1">Scanner BR Mania</h3>
           <button 
             onClick={onClose}
-            className="text-white p-1 rounded-full hover:bg-red-700"
+            className="text-white p-1 rounded-full hover:bg-green-700"
             aria-label="Fechar"
           >
             <FaTimes size={14} />
@@ -206,13 +206,22 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="relative w-64 h-32 border-2 border-yellow-400 rounded-lg overflow-hidden">
                 {/* Cantos do retângulo */}
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-red-600 -mt-0.5 -ml-0.5"></div>
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-red-600 -mt-0.5 -mr-0.5"></div>
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-red-600 -mb-0.5 -ml-0.5"></div>
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-red-600 -mb-0.5 -mr-0.5"></div>
+                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-yellow-400 -mt-0.5 -ml-0.5"></div>
+                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-yellow-400 -mt-0.5 -mr-0.5"></div>
+                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-yellow-400 -mb-0.5 -ml-0.5"></div>
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-yellow-400 -mb-0.5 -mr-0.5"></div>
                 
-                {/* Linha de escaneamento vermelha animada */}
-                <div className="absolute left-0 w-full h-0.5 bg-red-600 animate-scan-line"></div>
+                {/* Linha de escaneamento animada */}
+                <div style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  width: '100%',
+                  height: '2px',
+                  backgroundColor: '#E30613',
+                  boxShadow: '0 0 8px 2px rgba(227, 6, 19, 0.8)',
+                  zIndex: 15
+                }} className="animate-scan-line"></div>
               </div>
             </div>
             
@@ -230,7 +239,7 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
         <div className="p-1 bg-yellow-50 flex justify-center">
           <button 
             onClick={onClose}
-            className="bg-red-600 text-white px-4 py-1 rounded text-xs font-medium hover:bg-red-700"
+            className="bg-brmania-green text-white px-4 py-1 rounded text-xs font-medium hover:bg-green-700"
           >
             Cancelar
           </button>
