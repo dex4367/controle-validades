@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BrowserMultiFormatReader, Result, BarcodeFormat } from '@zxing/library';
+import { BrowserMultiFormatReader, Result, BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { IScannerControls } from '@zxing/browser';
 
 interface BarcodeScannerProps {
@@ -17,26 +17,37 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
 
   // Inicializar o scanner quando o componente montar
   useEffect(() => {
-    // Criar uma instância do leitor de código de barras
-    const reader = new BrowserMultiFormatReader();
+    // Criar uma instância do leitor de código de barras com configurações otimizadas
+    const hints = new Map();
     
-    // Configurar os formatos de código de barras suportados
-    const formats = new Map();
-    formats.set(2, [
+    // Configurar todos os formatos relevantes de código de barras
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13,
       BarcodeFormat.EAN_8,
       BarcodeFormat.UPC_A,
       BarcodeFormat.UPC_E,
       BarcodeFormat.CODE_39,
-      BarcodeFormat.CODE_128
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_93,
+      BarcodeFormat.DATA_MATRIX,
+      BarcodeFormat.QR_CODE
     ]);
-    reader.hints = formats;
+    
+    // Tentar várias vezes antes de falhar
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    
+    // Tolerância para códigos danificados
+    hints.set(DecodeHintType.PURE_BARCODE, false);
+    
+    const reader = new BrowserMultiFormatReader(hints);
     
     // Guardar referência para limpeza posterior
     readerRef.current = reader;
     
-    // Iniciar o scanner automaticamente
-    startScanner();
+    // Iniciar o scanner automaticamente após um breve atraso para permitir carregamento
+    setTimeout(() => {
+      startScanner();
+    }, 500);
     
     // Limpar recursos quando o componente desmontar
     return () => {
@@ -56,11 +67,14 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
       setError(null);
       
       // Configuração da câmera com preferência para câmera traseira em dispositivos móveis
+      // e configurações otimizadas para melhorar a leitura
       const constraints = {
         video: {
           facingMode: 'environment',
           width: { ideal: 1280 },
-          height: { ideal: 720 }
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+          aspectRatio: { ideal: 1.333333 } // 4:3
         }
       };
       
@@ -74,6 +88,15 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
             const scannedBarcode = result.getText();
             console.log('Código detectado:', scannedBarcode);
             setBarcode(scannedBarcode);
+            
+            // Reproduzir som de bipe quando detectar um código
+            const beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...');
+            beep.volume = 0.3;
+            try {
+              beep.play();
+            } catch (e) {
+              console.log('Não foi possível reproduzir o som de bipe');
+            }
             
             // Notificar o componente pai se o callback existir
             if (onBarcodeDetected) {
@@ -112,7 +135,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
 
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto">
-      <div className="w-full bg-gray-100 rounded-lg overflow-hidden shadow-lg mb-4">
+      <div className="w-full bg-black rounded-lg overflow-hidden shadow-lg mb-4">
         {/* Área do vídeo */}
         <div className="relative aspect-[4/3] w-full">
           <video 
@@ -120,12 +143,30 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
             className="w-full h-full object-cover"
             playsInline={true}
             muted={true}
+            autoPlay={true}
           />
           
           {/* Overlay para ajudar a posicionar o código de barras */}
           {scanning && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-64 h-64 border-2 border-blue-500 rounded-lg animate-pulse" />
+              {/* Moldura do scanner com efeitos visuais de scanner profissional */}
+              <div className="relative w-72 h-72 border-2 border-brmania-green rounded-lg">
+                {/* Cantos da moldura para dar efeito de scanner */}
+                <div className="absolute w-8 h-8 top-0 left-0 border-t-4 border-l-4 border-brmania-green rounded-tl"></div>
+                <div className="absolute w-8 h-8 top-0 right-0 border-t-4 border-r-4 border-brmania-green rounded-tr"></div>
+                <div className="absolute w-8 h-8 bottom-0 left-0 border-b-4 border-l-4 border-brmania-green rounded-bl"></div>
+                <div className="absolute w-8 h-8 bottom-0 right-0 border-b-4 border-r-4 border-brmania-green rounded-br"></div>
+                
+                {/* Linha de escaneamento animada */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-brmania-green opacity-80 animate-scan"></div>
+                
+                {/* Mensagem de ajuda */}
+                <div className="absolute -bottom-10 left-0 right-0 text-center">
+                  <span className="bg-black/70 text-white px-4 py-2 rounded-full text-sm inline-block">
+                    Posicione o código de barras dentro do quadro
+                  </span>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -162,7 +203,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onBarcodeDetected }) =>
           onClick={resetScanner}
           disabled={scanning && !barcode}
           className={`flex-1 py-2 px-4 rounded-lg ${!scanning || barcode
-            ? 'bg-blue-500 text-white hover:bg-blue-600' 
+            ? 'bg-brmania-green text-white hover:bg-brmania-green/90' 
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
         >
           {barcode ? 'Escanear Novamente' : 'Iniciar Scanner'}
