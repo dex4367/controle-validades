@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { getProductByBarcode, createProduct, getCategories } from '../services/supabase'
 import DatePicker from 'react-datepicker'
-import BarcodeScanner from '../components/BarcodeScanner'
 // Usando o arquivo CSS personalizado
 import '../styles/datepicker.css'
 // Importando ícones modernos
@@ -16,8 +15,7 @@ import {
   FaTrash, 
   FaBackspace,
   FaSearch,
-  FaBoxOpen,
-  FaCamera
+  FaBoxOpen
 } from 'react-icons/fa'
 
 interface AnimationState {
@@ -37,7 +35,7 @@ const MobileReceive = () => {
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
   const [existingProduct, setExistingProduct] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<'scan' | 'form' | 'edit' | 'camera'>('scan')
+  const [step, setStep] = useState<'scan' | 'form' | 'edit'>('scan')
   const [products, setProducts] = useState<any[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [isSwapping, setIsSwapping] = useState(false)
@@ -393,22 +391,12 @@ const MobileReceive = () => {
     }
   }
 
-  // Função para receber o código lido pelo scanner
-  const handleBarcodeScanned = (scannedBarcode: string) => {
-    console.log('📲 Código de barras recebido do scanner:', scannedBarcode);
-    if (scannedBarcode) {
-      setBarcode(scannedBarcode);
-      console.log('🔍 Iniciando busca do produto para o código:', scannedBarcode);
-      checkProduct(scannedBarcode);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-brmania-light">
       <header className="bg-brmania-green text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold">Escanear Produto</h1>
-          {(step === 'scan' || step === 'camera') && products.length > 0 && (
+          <h1 className="text-xl font-bold">Cadastrar Produto</h1>
+          {step === 'scan' && products.length > 0 && (
             <span className="bg-brmania-yellow text-brmania-dark px-3 py-1 rounded-full text-sm font-semibold">
               {products.length} {products.length === 1 ? 'item' : 'itens'}
             </span>
@@ -458,31 +446,7 @@ const MobileReceive = () => {
                       {loading ? <span className="animate-pulse">...</span> : <FaSearch />}
                     </button>
                   </div>
-                  
-                  <button
-                    onClick={() => setStep('camera')}
-                    className="w-full bg-brmania-green text-white py-3 px-4 rounded-lg font-medium flex justify-center items-center shadow-lg"
-                  >
-                    <FaCamera className="mr-2" /> Usar Câmera
-                  </button>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 'camera' && (
-          <div className="p-4">
-            <div className="bg-white rounded-lg shadow-lg overflow-hidden p-4">
-              <h2 className="text-lg font-semibold text-center mb-4">Scanner de Código de Barras</h2>
-              <BarcodeScanner onBarcodeDetected={handleBarcodeScanned} />
-              <div className="mt-4">
-                <button
-                  onClick={() => setStep('scan')}
-                  className="w-full bg-brmania-yellow text-brmania-dark py-3 px-4 rounded-lg font-medium flex justify-center items-center shadow-lg mt-4"
-                >
-                  <FaBackspace className="mr-2" /> Voltar para Entrada Manual
-                </button>
               </div>
             </div>
           </div>
