@@ -73,15 +73,21 @@ const BarcodeScanner = ({ onBarcodeDetected }: BarcodeScannerProps) => {
                   // Evitar detecções repetidas do mesmo código
                   if (code !== detectedCode) {
                     setDetectedCode(code);
-                    onBarcodeDetected(code);
                     
                     // Reproduzir som de beep
                     const audio = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...');
                     audio.volume = 0.5;
                     audio.play().catch(e => console.log('Erro ao reproduzir som'));
                     
-                    // Parar o scanner após detectar o código
-                    stopScanning();
+                    // Chamar a função de callback ANTES de parar o scanner
+                    console.log("🔄 Enviando código para componente pai:", code);
+                    onBarcodeDetected(code);
+                    
+                    // Pequeno delay para garantir que a UI seja atualizada antes de parar o scanner
+                    setTimeout(() => {
+                      // Parar o scanner após detectar o código
+                      stopScanning();
+                    }, 300);
                   }
                 }
               })

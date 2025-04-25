@@ -71,8 +71,10 @@ const MobileReceive = () => {
 
   const checkProduct = async (barcodeValue: string) => {
     try {
+      console.log('🔎 checkProduct iniciado para código:', barcodeValue);
       setLoading(true)
       const product = await getProductByBarcode(barcodeValue)
+      console.log('📦 Resultado da busca:', product ? 'Produto encontrado' : 'Produto não encontrado');
       
       if (product) {
         setExistingProduct(product)
@@ -86,6 +88,7 @@ const MobileReceive = () => {
         })
       } else {
         setExistingProduct(null)
+        setProductName(''); // Limpar nome para produto novo
         setMessage(null)
       }
       
@@ -93,9 +96,12 @@ const MobileReceive = () => {
       const today = new Date();
       setExpiryDate(today);
       setExpiryDateStr(today.toISOString().split('T')[0]);
-      setStep('form')
+      
+      console.log('🔄 Alterando step para "form"');
+      setStep('form');
+      console.log('✅ Step alterado para:', 'form');
     } catch (error) {
-      console.error('Erro ao verificar produto:', error)
+      console.error('❌ Erro ao verificar produto:', error)
       setMessage({
         type: 'error',
         text: 'Erro ao buscar produto. Tente novamente.'
@@ -389,8 +395,10 @@ const MobileReceive = () => {
 
   // Função para receber o código lido pelo scanner
   const handleBarcodeScanned = (scannedBarcode: string) => {
+    console.log('📲 Código de barras recebido do scanner:', scannedBarcode);
     if (scannedBarcode) {
       setBarcode(scannedBarcode);
+      console.log('🔍 Iniciando busca do produto para o código:', scannedBarcode);
       checkProduct(scannedBarcode);
     }
   }
