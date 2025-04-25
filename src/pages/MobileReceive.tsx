@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/library'
 import { getProductByBarcode, createProduct, getCategories } from '../services/supabase'
 import DatePicker from 'react-datepicker'
 // Usando o arquivo CSS personalizado
@@ -7,7 +6,6 @@ import '../styles/datepicker.css'
 // Importando ícones modernos
 import { 
   FaBarcode, 
-  FaCamera, 
   FaCheckCircle, 
   FaTimesCircle, 
   FaArrowUp, 
@@ -28,8 +26,6 @@ interface AnimationState {
 }
 
 const MobileReceive = () => {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [scanning, setScanning] = useState(false)
   const [barcode, setBarcode] = useState('')
   const [productName, setProductName] = useState('')
   const [expiryDateStr, setExpiryDateStr] = useState('')
@@ -50,31 +46,9 @@ const MobileReceive = () => {
     direction: 'up'
   })
 
-  // Referência para o leitor de código de barras
-  const codeReader = useRef<BrowserMultiFormatReader | null>(null)
-
   useEffect(() => {
-    // Inicializar o leitor de código de barras
-    codeReader.current = new BrowserMultiFormatReader()
-    const hints = new Map()
-    hints.set(2, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E])
-    codeReader.current.hints = hints
-
     // Buscar categorias no primeiro carregamento
     loadCategories()
-    
-    // Iniciar scanner automaticamente
-    setTimeout(() => {
-      startScan()
-    }, 500)
-
-    // Limpar ao desmontar
-    return () => {
-      if (codeReader.current) {
-        codeReader.current.reset()
-        setScanning(false)
-      }
-    }
   }, [])
 
   const loadCategories = async () => {
@@ -91,96 +65,6 @@ const MobileReceive = () => {
         text: 'Erro ao carregar categorias. Verifique sua conexão.'
       })
     }
-  }
-
-  const startScan = () => {
-    if (!codeReader.current || !videoRef.current) {
-      console.error('Referências não disponíveis:', { 
-        codeReader: !!codeReader.current, 
-        videoRef: !!videoRef.current 
-      });
-      setMessage({
-        type: 'error',
-        text: 'Erro ao inicializar o scanner. Tente novamente.'
-      });
-      return;
-    }
-    
-    try {
-      setScanning(true);
-      setMessage(null);
-      
-      console.log('Iniciando scanner...');
-      
-      // Configurações específicas para a câmera móvel
-      const constraints = {
-        facingMode: 'environment', // Use câmera traseira
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      };
-      
-      // Inicializa o leitor novamente em vez de fazer reset
-      codeReader.current = new BrowserMultiFormatReader();
-      const hints = new Map();
-      hints.set(2, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]);
-      codeReader.current.hints = hints;
-      
-      // Iniciar o scanner com um pequeno atraso para garantir que a interface esteja pronta
-      setTimeout(() => {
-        try {
-          console.log('Tentando iniciar o scanner após delay...');
-          if (codeReader.current && videoRef.current) {
-            codeReader.current.decodeFromConstraints(
-              { video: constraints },
-              videoRef.current,
-              (result, error) => {
-                if (result) {
-                  console.log('Código detectado:', result.getText());
-                  const barcodeValue = result.getText();
-                  setBarcode(barcodeValue);
-                  stopScan();
-                  checkProduct(barcodeValue);
-                }
-                if (error && !(error instanceof TypeError)) {
-                  console.error('Erro durante a leitura:', error);
-                }
-              }
-            );
-            console.log('Scanner iniciado com sucesso após delay');
-          } else {
-            console.error('Referências perdidas após atraso');
-          }
-        } catch (innerErr) {
-          console.error('Erro ao iniciar scanner após delay:', innerErr);
-          setMessage({
-            type: 'error',
-            text: 'Falha ao iniciar o scanner. Tente novamente.'
-          });
-          setScanning(false);
-        }
-      }, 300);
-      
-    } catch (err) {
-      console.error('Erro ao iniciar o scanner:', err);
-      setMessage({
-        type: 'error',
-        text: 'Não foi possível acessar a câmera. Verifique as permissões do navegador.'
-      });
-      setScanning(false);
-    }
-  };
-
-  const stopScan = () => {
-    console.log('Parando o scanner...');
-    if (codeReader.current) {
-      try {
-        codeReader.current.reset();
-        console.log('Scanner parado com sucesso');
-      } catch (err) {
-        console.error('Erro ao parar o scanner:', err);
-      }
-    }
-    setScanning(false);
   }
 
   const checkProduct = async (barcodeValue: string) => {
@@ -524,103 +408,41 @@ const MobileReceive = () => {
 
       <main className="container mx-auto p-4">
         {step === 'scan' && (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            {scanning ? (
-              <div className="relative">
-                <div className="relative">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-80 object-cover aspect-[4/3]"
-                    playsInline={true}
-                    autoPlay={true}
-                    muted={true}
-                  ></video>
-                  <div className="absolute inset-0 border-2 border-brmania-yellow box-content pointer-events-none">
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-2 border-brmania-yellow rounded-lg"></div>
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-2 border-brmania-yellow rounded-lg opacity-50 animate-pulse"></div>
-                  </div>
-                  <div className="absolute bottom-16 left-0 right-0 text-center">
-                    <span className="bg-black/50 text-white px-4 py-2 rounded-full text-sm inline-block">
-                      Posicione o código de barras dentro do quadro
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={stopScan}
-                  className="absolute bottom-4 right-4 bg-red-500 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center shadow-lg"
-                >
-                  <FaTimesCircle className="mr-2" /> Parar
-                </button>
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden p-6">
+            {message && message.type === 'error' && (
+              <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-6">
+                <p className="flex items-center">
+                  <FaTimesCircle className="mr-2" /> {message.text}
+                </p>
               </div>
-            ) : (
-              <div className="p-6">
-                {message && message.type === 'error' && (
-                  <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-6">
-                    <p className="flex items-center">
-                      <FaTimesCircle className="mr-2" /> {message.text}
-                    </p>
-                    <button 
-                      onClick={() => {
-                        setMessage(null);
-                        // Solicitar permissão novamente
-                        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                          .then(stream => {
-                            // Liberar a stream
-                            stream.getTracks().forEach(track => track.stop());
-                            // Tentar escanear novamente
-                            setTimeout(() => startScan(), 500);
-                          })
-                          .catch(err => {
-                            console.error("Erro ao solicitar permissão:", err);
-                            setMessage({
-                              type: 'error',
-                              text: 'Permissão negada. Verifique as configurações do seu navegador.'
-                            });
-                          });
-                      }}
-                      className="mt-3 bg-red-600 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center"
-                    >
-                      Tentar Novamente
-                    </button>
-                  </div>
-                )}
+            )}
+            
+            <div className="mb-6">
+              <div className="flex flex-col items-center justify-center bg-brmania-light p-8 rounded-lg mb-6">
+                <FaBarcode className="text-7xl text-brmania-green mb-4" />
+                <p className="text-brmania-dark text-center mb-4">Digite o código de barras manualmente</p>
                 
-                <div className="bg-brmania-light p-8 rounded-lg flex flex-col items-center justify-center">
-                  <FaBarcode className="text-7xl text-brmania-green mb-4" />
-                  <p className="text-brmania-dark text-center mb-4">Apontando câmera para o código de barras...</p>
-                </div>
-
-                <div className="mt-6">
-                  <p className="text-brmania-dark text-center mb-4">Não está funcionando? Digite o código manualmente:</p>
+                <div className="w-full max-w-md">
                   <div className="flex mb-4">
                     <input
                       type="text"
                       value={barcode}
                       onChange={handleBarcodeInput}
+                      className="w-full p-3 border border-brmania-dark/20 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
                       placeholder="Digite o código de barras"
-                      className="flex-1 p-3 border border-gray-300 bg-white text-brmania-dark rounded-l-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
+                      onKeyPress={(e) => e.key === 'Enter' && handleManualCheck()}
                     />
                     <button
                       onClick={handleManualCheck}
                       className="bg-brmania-green text-white p-3 rounded-r-lg"
+                      disabled={loading}
                     >
-                      <FaSearch />
+                      {loading ? <span className="animate-pulse">...</span> : <FaSearch />}
                     </button>
                   </div>
                 </div>
-                
-                {products.length > 0 && (
-                  <div className="mt-6">
-                    <button
-                      onClick={handleFinishReceiving}
-                      className="w-full bg-brmania-yellow text-brmania-dark py-3 px-4 rounded-lg font-medium flex justify-center items-center shadow-lg"
-                    >
-                      <FaSave className="mr-2" /> Finalizar Recebimento ({products.length})
-                    </button>
-                  </div>
-                )}
               </div>
-            )}
+            </div>
           </div>
         )}
 

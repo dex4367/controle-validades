@@ -3,7 +3,6 @@ import Layout from './components/Layout'
 import ProductForm from './pages/ProductForm'
 import ProductList from './pages/ProductList'
 import Reports from './pages/Reports'
-import CameraTest from './pages/CameraTest'
 import Dashboard from './pages/Dashboard'
 import MobileReceive from './pages/MobileReceive'
 import { Outlet } from 'react-router-dom'
@@ -40,10 +39,6 @@ const router = createBrowserRouter([
       {
         path: '/mobile-receive',
         element: <MobileReceive />
-      },
-      {
-        path: '/camera-test',
-        element: <CameraTest />
       }
     ]
   }
