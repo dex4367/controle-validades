@@ -171,10 +171,10 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
                 <div className="corner top-right"></div>
                 <div className="corner bottom-left"></div>
                 <div className="corner bottom-right"></div>
+                
+                {/* Linha de escaneamento animada (agora dentro do scan-frame) */}
+                <div className="scan-line"></div>
               </div>
-              
-              {/* Linha de escaneamento animada */}
-              <div className="scan-line"></div>
               
               {/* Mensagem de orientação durante o escaneamento */}
               <div className="scanning-message">

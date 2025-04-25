@@ -14,7 +14,7 @@
   display: flex;
   align-items: center;
   padding: 1rem;
-  background-color: #1e40af;
+  background-color: #e30613;
   color: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -65,7 +65,7 @@
 
 .start-button,
 .stop-button {
-  background-color: #2563eb;
+  background-color: #e30613;
   color: white;
   border: none;
   border-radius: 6px;
@@ -82,7 +82,7 @@
 
 .start-button:hover,
 .stop-button:hover {
-  background-color: #1d4ed8;
+  background-color: #c50000;
 }
 
 .stop-button {
@@ -141,6 +141,7 @@
   box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.5);
   z-index: 10;
   pointer-events: none;
+  overflow: hidden;
 }
 
 /* Cantos destacados no quadro */
@@ -148,7 +149,7 @@
   position: absolute;
   width: 20px;
   height: 20px;
-  border: 3px solid #ffcc00;
+  border: 3px solid #e30613;
   z-index: 11;
 }
 
@@ -187,30 +188,25 @@
 /* Linha de escaneamento animada */
 .scan-line {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 75%;
+  left: 0;
+  width: 100%;
   height: 2px;
-  background-color: #ff0000;
-  box-shadow: 0 0 8px 2px rgba(255, 0, 0, 0.8);
+  background-color: #e30613;
+  box-shadow: 0 0 8px 2px rgba(227, 6, 19, 0.8);
   z-index: 12;
-  animation: scanAnimation 1.8s ease-in-out infinite;
+  animation: scanAnimation 2s ease-in-out infinite;
   pointer-events: none;
 }
 
 @keyframes scanAnimation {
   0% {
-    transform: translate(-50%, -150%);
-    opacity: 0.8;
+    top: 10%;
   }
   50% {
-    transform: translate(-50%, 150%);
-    opacity: 1;
+    top: 90%;
   }
   100% {
-    transform: translate(-50%, -150%);
-    opacity: 0.8;
+    top: 10%;
   }
 }
 
@@ -250,7 +246,7 @@
 
 .result-container h3 {
   margin-top: 0;
-  color: #2563eb;
+  color: #e30613;
   font-size: 1.2rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
