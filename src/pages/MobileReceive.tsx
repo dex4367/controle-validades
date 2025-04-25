@@ -62,6 +62,11 @@ const MobileReceive = () => {
 
     // Buscar categorias no primeiro carregamento
     loadCategories()
+    
+    // Iniciar scanner automaticamente
+    setTimeout(() => {
+      startScan()
+    }, 500)
 
     // Limpar ao desmontar
     return () => {
@@ -582,13 +587,7 @@ const MobileReceive = () => {
                 
                 <div className="bg-brmania-light p-8 rounded-lg flex flex-col items-center justify-center">
                   <FaBarcode className="text-7xl text-brmania-green mb-4" />
-                  <p className="text-brmania-dark text-center mb-4">Câmera não disponível</p>
-                  <button
-                    onClick={startScan}
-                    className="bg-brmania-green text-white py-3 px-6 rounded-lg font-medium flex justify-center items-center shadow-lg mb-4"
-                  >
-                    <FaCamera className="mr-2" /> Abrir Câmera
-                  </button>
+                  <p className="text-brmania-dark text-center mb-4">Apontando câmera para o código de barras...</p>
                 </div>
 
                 <div className="mt-6">
