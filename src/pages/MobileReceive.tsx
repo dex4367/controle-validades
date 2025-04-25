@@ -105,9 +105,6 @@ const MobileReceive = () => {
       setScanning(true);
       setMessage(null);
       
-      // Reset antes de iniciar para limpar qualquer estado anterior
-      codeReader.current.reset();
-      
       console.log('Iniciando scanner...');
       
       // Configurações específicas para a câmera móvel
@@ -117,25 +114,47 @@ const MobileReceive = () => {
         height: { ideal: 720 }
       };
       
-      // Iniciar o scanner diretamente, sem verificações adicionais
-      codeReader.current.decodeFromConstraints(
-        { video: constraints },
-        videoRef.current,
-        (result, error) => {
-          if (result) {
-            console.log('Código detectado:', result.getText());
-            const barcodeValue = result.getText();
-            setBarcode(barcodeValue);
-            stopScan();
-            checkProduct(barcodeValue);
-          }
-          if (error && !(error instanceof TypeError)) {
-            console.error('Erro durante a leitura:', error);
-          }
-        }
-      );
+      // Inicializa o leitor novamente em vez de fazer reset
+      codeReader.current = new BrowserMultiFormatReader();
+      const hints = new Map();
+      hints.set(2, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]);
+      codeReader.current.hints = hints;
       
-      console.log('Scanner iniciado com sucesso');
+      // Iniciar o scanner com um pequeno atraso para garantir que a interface esteja pronta
+      setTimeout(() => {
+        try {
+          console.log('Tentando iniciar o scanner após delay...');
+          if (codeReader.current && videoRef.current) {
+            codeReader.current.decodeFromConstraints(
+              { video: constraints },
+              videoRef.current,
+              (result, error) => {
+                if (result) {
+                  console.log('Código detectado:', result.getText());
+                  const barcodeValue = result.getText();
+                  setBarcode(barcodeValue);
+                  stopScan();
+                  checkProduct(barcodeValue);
+                }
+                if (error && !(error instanceof TypeError)) {
+                  console.error('Erro durante a leitura:', error);
+                }
+              }
+            );
+            console.log('Scanner iniciado com sucesso após delay');
+          } else {
+            console.error('Referências perdidas após atraso');
+          }
+        } catch (innerErr) {
+          console.error('Erro ao iniciar scanner após delay:', innerErr);
+          setMessage({
+            type: 'error',
+            text: 'Falha ao iniciar o scanner. Tente novamente.'
+          });
+          setScanning(false);
+        }
+      }, 300);
+      
     } catch (err) {
       console.error('Erro ao iniciar o scanner:', err);
       setMessage({
@@ -147,10 +166,16 @@ const MobileReceive = () => {
   };
 
   const stopScan = () => {
+    console.log('Parando o scanner...');
     if (codeReader.current) {
-      codeReader.current.reset()
-      setScanning(false)
+      try {
+        codeReader.current.reset();
+        console.log('Scanner parado com sucesso');
+      } catch (err) {
+        console.error('Erro ao parar o scanner:', err);
+      }
     }
+    setScanning(false);
   }
 
   const checkProduct = async (barcodeValue: string) => {
