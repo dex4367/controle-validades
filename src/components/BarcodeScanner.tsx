@@ -13,24 +13,24 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
+  const scanIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Configurações para o leitor de código de barras
+    // Configurações otimizadas para o leitor de código de barras
     const hints = new Map();
+    // Foco apenas nos formatos mais comuns para melhorar a velocidade
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13,
       BarcodeFormat.EAN_8,
-      BarcodeFormat.CODE_39,
       BarcodeFormat.CODE_128,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
-      BarcodeFormat.DATA_MATRIX,
-      BarcodeFormat.QR_CODE,
     ]);
     
-    // Configurar para maior precisão
-    hints.set(DecodeHintType.TRY_HARDER, true);
-
+    // Desativar TRY_HARDER para scan mais rápido
+    hints.set(DecodeHintType.TRY_HARDER, false);
+    
+    // Configurar para ser mais tolerante a erros (mais rápido)
+    hints.set(DecodeHintType.PURE_BARCODE, true);
+    
     const codeReader = new BrowserMultiFormatReader(hints);
     let stopScanning = false;
 
@@ -38,33 +38,61 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
       if (stopScanning || !webcamRef.current || !isCameraReady) return;
 
       try {
+        // Captura imagem com resolução reduzida para processamento mais rápido
         const imageSrc = webcamRef.current.getScreenshot();
         
         if (imageSrc) {
-          try {
-            // Criar uma imagem a partir do screenshot
-            const image = new Image();
-            image.src = imageSrc;
-            
-            // Aguardar até que a imagem carregue
-            await new Promise((resolve) => {
-              image.onload = resolve;
-            });
-            
-            // Tentar decodificar o código de barras a partir da imagem
-            const result = await codeReader.decodeFromImage(image);
-            
-            if (result && result.getText()) {
-              onBarcodeDetected(result.getText());
-              stopScanning = true;
-              return;
+          // Usar createImageBitmap para processamento mais rápido quando disponível
+          if (typeof createImageBitmap !== 'undefined') {
+            try {
+              const imageBlob = await fetch(imageSrc).then(res => res.blob());
+              const imageBitmap = await createImageBitmap(imageBlob);
+              
+              // Criar canvas temporário
+              const canvas = document.createElement('canvas');
+              canvas.width = imageBitmap.width;
+              canvas.height = imageBitmap.height;
+              const ctx = canvas.getContext('2d');
+              
+              if (ctx) {
+                // Desenhar imagem no canvas
+                ctx.drawImage(imageBitmap, 0, 0);
+                
+                // Converter para URL de dados para usar com o decodificador
+                const dataUrl = canvas.toDataURL('image/jpeg');
+                
+                try {
+                  // Tentar decodificar a partir da URL de dados
+                  const img = new Image();
+                  img.src = dataUrl;
+                  
+                  // Processar imagem quando estiver carregada
+                  img.onload = async () => {
+                    try {
+                      const result = await codeReader.decodeFromImage(img);
+                      if (result && result.getText()) {
+                        onBarcodeDetected(result.getText());
+                        stopScanning = true;
+                      }
+                    } catch (e) {
+                      // Ignorar erros de decodificação
+                    }
+                  };
+                } catch (e) {
+                  // Ignorar erros de decodificação
+                }
+              }
+            } catch (e) {
+              // Fallback para método antigo se createImageBitmap falhar
+              processWithImage(imageSrc);
             }
-          } catch (error) {
-            // Ignorar erros de decodificação e continuar escaneando
+          } else {
+            // Fallback para navegadores que não suportam createImageBitmap
+            processWithImage(imageSrc);
           }
         }
         
-        // Continuar o loop de escaneamento
+        // Continuar o loop de escaneamento com requestAnimationFrame para melhor desempenho
         if (!stopScanning) {
           requestAnimationFrame(scanBarcode);
         }
@@ -74,12 +102,45 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
       }
     };
 
+    const processWithImage = async (imageSrc: string) => {
+      try {
+        const image = new Image();
+        image.src = imageSrc;
+        
+        // Usar evento onload em vez de promise para melhor desempenho
+        image.onload = async () => {
+          try {
+            const result = await codeReader.decodeFromImage(image);
+            if (result && result.getText()) {
+              onBarcodeDetected(result.getText());
+              stopScanning = true;
+            }
+          } catch (e) {
+            // Ignorar erros de decodificação
+          }
+        };
+      } catch (e) {
+        // Ignorar erros
+      }
+    };
+
     if (isCameraReady) {
+      // Iniciar escaneamento imediatamente
       scanBarcode();
+      
+      // Também configurar um intervalo para garantir execução frequente
+      scanIntervalRef.current = window.setInterval(() => {
+        if (!stopScanning) {
+          scanBarcode();
+        }
+      }, 200); // Tentar escanear a cada 200ms mesmo se o requestAnimationFrame falhar
     }
 
     return () => {
       stopScanning = true;
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+      }
       codeReader.reset();
     };
   }, [isCameraReady, onBarcodeDetected]);
@@ -120,12 +181,12 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
               ref={webcamRef}
               audio={false}
               screenshotFormat="image/jpeg"
+              screenshotQuality={0.7} // Reduzir qualidade para processamento mais rápido
               videoConstraints={{
                 facingMode: 'environment',
                 width: { min: 640, ideal: 1280, max: 1920 },
                 height: { min: 480, ideal: 720, max: 1080 },
                 aspectRatio: 4/3,
-                // Aumentar a qualidade e o framerate
                 frameRate: { ideal: 30, min: 15 },
               }}
               onUserMedia={handleUserMedia}
@@ -152,10 +213,10 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
           </div>
         )}
 
-        {/* Instruções e botões */}
+        {/* Instruções */}
         <div className="p-3 bg-gray-50">
           <p className="text-xs text-center text-gray-600 mb-2">
-            Posicione o código de barras dentro da área verde
+            Posicione o código de barras na área verde
           </p>
           <div className="flex justify-center">
             <button 
