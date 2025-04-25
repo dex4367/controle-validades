@@ -129,12 +129,10 @@ const MobileReceive = () => {
         height: { ideal: 720 }
       };
       
-      // Abordagem mais direta para acessar a câmera
-      codeReader.current.reset(); // Limpar qualquer instância anterior
-      
-      codeReader.current.decodeFromVideoDevice(
-        null, // null para usar a câmera padrão (geralmente a traseira em dispositivos móveis)
-        videoRef.current,
+      // Iniciar o scanner diretamente
+      codeReader.current.decodeFromConstraints(
+        { video: constraints },
+        videoRef.current as HTMLVideoElement,
         (result, error) => {
           if (result) {
             const barcodeValue = result.getText()
@@ -146,7 +144,7 @@ const MobileReceive = () => {
             console.error('Erro durante a leitura:', error)
           }
         }
-      );
+      )
     } catch (err) {
       console.error('Erro ao iniciar o scanner:', err)
       setMessage({
@@ -570,25 +568,7 @@ const MobileReceive = () => {
                   <FaBarcode className="text-7xl text-brmania-green mb-4" />
                   <p className="text-brmania-dark text-center mb-4">Câmera não disponível</p>
                   <button
-                    onClick={() => {
-                      // Garantir que temos permissão antes de tentar abrir a câmera
-                      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                        .then(stream => {
-                          // Liberar o stream inicial
-                          stream.getTracks().forEach(track => track.stop());
-                          // Iniciar o scanner com um pequeno atraso
-                          setTimeout(() => {
-                            startScan();
-                          }, 300);
-                        })
-                        .catch(error => {
-                          console.error("Erro ao acessar câmera:", error);
-                          setMessage({
-                            type: 'error',
-                            text: 'Permissão da câmera negada. Por favor, permita o acesso nas configurações do seu navegador.'
-                          });
-                        });
-                    }}
+                    onClick={startScan}
                     className="bg-brmania-green text-white py-3 px-6 rounded-lg font-medium flex justify-center items-center shadow-lg mb-4"
                   >
                     <FaCamera className="mr-2" /> Abrir Câmera
