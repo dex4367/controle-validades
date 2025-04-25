@@ -63,10 +63,32 @@ const MobileReceive = () => {
     // Buscar categorias no primeiro carregamento
     loadCategories()
 
-    // Iniciar o scanner automaticamente após carregar as categorias
-    setTimeout(() => {
-      startScan();
-    }, 1000);
+    // Verificar se o navegador suporta getUserMedia
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      // Mostrar prompt de permissão e iniciar o scanner
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+          // Parar o stream imediatamente, apenas para garantir a permissão
+          stream.getTracks().forEach(track => track.stop());
+          
+          // Iniciar scanner com atraso
+          setTimeout(() => {
+            startScan();
+          }, 1000);
+        })
+        .catch(error => {
+          console.error("Erro de permissão da câmera:", error);
+          setMessage({
+            type: 'error',
+            text: 'Permissão da câmera negada. Por favor, permita o acesso à câmera nas configurações do seu navegador.'
+          });
+        });
+    } else {
+      setMessage({
+        type: 'error',
+        text: 'Seu navegador não suporta acesso à câmera. Tente outro navegador.'
+      });
+    }
 
     // Limpar ao desmontar
     return () => {
@@ -93,79 +115,27 @@ const MobileReceive = () => {
     }
   }
 
-  // Função para solicitar permissão da câmera explicitamente
-  const requestCameraPermission = async (): Promise<boolean> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      // Liberando a stream após obter permissão
-      stream.getTracks().forEach(track => track.stop());
-      return true;
-    } catch (err) {
-      console.error('Erro ao solicitar permissão da câmera:', err);
-      
-      // Verificar se o erro é de permissão negada
-      if (err instanceof DOMException && 
-         (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
-        setMessage({
-          type: 'error',
-          text: 'Permissão para acessar a câmera foi negada. Por favor, permita o acesso nas configurações do seu navegador.'
-        });
-      }
-      return false;
-    }
-  }
-
   const startScan = async () => {
     if (!codeReader.current || !videoRef.current) return
-    
-    // Verificar/solicitar permissão primeiro
-    const hasPermission = await requestCameraPermission();
-    if (!hasPermission) {
-      return; // Não prossegue se não tiver permissão
-    }
     
     try {
       setScanning(true)
       setMessage(null)
       
-      // Opções para a câmera móvel - preferir câmera traseira
+      // Configurações específicas para a câmera móvel
       const constraints = {
-        facingMode: "environment", // Usar câmera traseira
+        facingMode: 'environment', // Use câmera traseira
         width: { ideal: 1280 },
         height: { ideal: 720 }
       };
       
-      await codeReader.current.decodeFromConstraints(
-        { video: constraints },
-        videoRef.current,
-        (result, error) => {
-          if (result) {
-            const barcodeValue = result.getText()
-            setBarcode(barcodeValue)
-            stopScan()
-            checkProduct(barcodeValue)
-          }
-          if (error && !(error instanceof TypeError)) {
-            // Ignorar erros de timeout
-            console.error('Erro durante a leitura:', error)
-          }
-        }
-      )
-    } catch (err) {
-      console.error('Erro ao iniciar o scanner:', err)
-      setMessage({
-        type: 'error',
-        text: 'Não foi possível acessar a câmera. Verifique as permissões.'
-      })
-      setScanning(false)
-      
-      // Tente uma alternativa se a primeira abordagem falhar
-      try {
-        const deviceId = await getBackCameraId();
-        if (deviceId && codeReader.current && videoRef.current) {
-          await codeReader.current.decodeFromVideoDevice(
-            deviceId, 
-            videoRef.current,
+      // Tentar iniciar o scanner
+      await navigator.mediaDevices.getUserMedia({ video: constraints })
+        .then(() => {
+          // Se getUserMedia for bem-sucedido, iniciar o scanner
+          codeReader.current?.decodeFromConstraints(
+            { video: constraints },
+            videoRef.current as HTMLVideoElement,
             (result, error) => {
               if (result) {
                 const barcodeValue = result.getText()
@@ -174,36 +144,18 @@ const MobileReceive = () => {
                 checkProduct(barcodeValue)
               }
               if (error && !(error instanceof TypeError)) {
-                console.error('Erro durante a leitura (segunda tentativa):', error)
+                console.error('Erro durante a leitura:', error)
               }
             }
-          );
-          setScanning(true);
-          setMessage(null);
-        }
-      } catch (alternativeErr) {
-        console.error('Erro alternativo:', alternativeErr);
-      }
-    }
-  }
-
-  // Função auxiliar para obter o ID da câmera traseira
-  const getBackCameraId = async (): Promise<string | null> => {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      
-      // Em dispositivos móveis, geralmente a câmera traseira é a última na lista
-      // ou tem "back" no rótulo
-      const backCamera = videoDevices.find(device => 
-        device.label.toLowerCase().includes('back') || 
-        device.label.toLowerCase().includes('traseira')
-      ) || videoDevices[videoDevices.length - 1];
-      
-      return backCamera?.deviceId || null;
-    } catch (error) {
-      console.error('Erro ao enumerar dispositivos:', error);
-      return null;
+          )
+        });
+    } catch (err) {
+      console.error('Erro ao iniciar o scanner:', err)
+      setMessage({
+        type: 'error',
+        text: 'Não foi possível acessar a câmera. Verifique as permissões do navegador.'
+      })
+      setScanning(false)
     }
   }
 
@@ -585,6 +537,37 @@ const MobileReceive = () => {
               </div>
             ) : (
               <div className="p-6">
+                {message && message.type === 'error' && (
+                  <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-6">
+                    <p className="flex items-center">
+                      <FaTimesCircle className="mr-2" /> {message.text}
+                    </p>
+                    <button 
+                      onClick={() => {
+                        setMessage(null);
+                        // Solicitar permissão novamente
+                        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                          .then(stream => {
+                            // Liberar a stream
+                            stream.getTracks().forEach(track => track.stop());
+                            // Tentar escanear novamente
+                            setTimeout(() => startScan(), 500);
+                          })
+                          .catch(err => {
+                            console.error("Erro ao solicitar permissão:", err);
+                            setMessage({
+                              type: 'error',
+                              text: 'Permissão negada. Verifique as configurações do seu navegador.'
+                            });
+                          });
+                      }}
+                      className="mt-3 bg-red-600 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center"
+                    >
+                      Tentar Novamente
+                    </button>
+                  </div>
+                )}
+                
                 <div className="bg-brmania-light p-8 rounded-lg flex flex-col items-center justify-center">
                   <FaBarcode className="text-7xl text-brmania-green mb-4" />
                   <p className="text-brmania-dark text-center mb-4">Câmera não disponível</p>
