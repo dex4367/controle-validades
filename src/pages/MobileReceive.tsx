@@ -569,7 +569,7 @@ const MobileReceive = () => {
                   type="text"
                   value={barcode}
                   onChange={handleBarcodeInput}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brmania-green"
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   readOnly={existingProduct !== null}
                 />
               </div>
