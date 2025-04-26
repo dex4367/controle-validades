@@ -34,7 +34,7 @@ const Dashboard = () => {
         const expired = data?.filter(product => isExpired(product.expiry_date))?.length || 0
         const expiringSoon = data?.filter(product => {
           const days = calculateDaysRemaining(product.expiry_date)
-          return days >= 0 && days <= 30
+          return !isExpired(product.expiry_date) && days <= 30
         })?.length || 0
         
         setStats({
@@ -56,7 +56,7 @@ const Dashboard = () => {
   const upcomingProducts = products
     .filter(product => {
       const days = calculateDaysRemaining(product.expiry_date)
-      return days >= 0 && days <= 30
+      return !isExpired(product.expiry_date) && days <= 30
     })
     .sort((a, b) => new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime())
     .slice(0, 5) // Mostrar apenas os 5 primeiros

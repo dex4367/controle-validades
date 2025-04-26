@@ -127,19 +127,19 @@ const Reports = () => {
         const expired = uniqueProducts.filter(product => isExpired(product.expiry_date)).length
         const expiringIn7 = uniqueProducts.filter(product => {
           const days = calculateDaysRemaining(product.expiry_date)
-          return days >= 0 && days <= 7
+          return !isExpired(product.expiry_date) && days <= 7
         }).length
         const expiringIn30 = uniqueProducts.filter(product => {
           const days = calculateDaysRemaining(product.expiry_date)
-          return days >= 0 && days <= 30
+          return !isExpired(product.expiry_date) && days <= 30
         }).length
         const expiringIn60 = uniqueProducts.filter(product => {
           const days = calculateDaysRemaining(product.expiry_date)
-          return days >= 0 && days <= 60
+          return !isExpired(product.expiry_date) && days <= 60
         }).length
         const expiringIn90 = uniqueProducts.filter(product => {
           const days = calculateDaysRemaining(product.expiry_date)
-          return days >= 0 && days <= 90
+          return !isExpired(product.expiry_date) && days <= 90
         }).length
         
         setStats({
