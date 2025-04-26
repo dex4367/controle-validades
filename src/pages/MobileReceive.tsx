@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { getProductByBarcode, createProduct, getCategories, getProductNameSuggestions, saveProductNameToHistory, getProductHistoryByBarcode } from '../services/supabase'
+import { fetchProductFromOpenFoodFacts, getProductName } from '../services/openFoodFacts'
 // Removendo a importação do DatePicker que não será mais necessária
 // import DatePicker from 'react-datepicker'
 // import '../styles/datepicker.css'
@@ -16,9 +17,11 @@ import {
   FaSearch,
   FaBoxOpen,
   FaCamera,
-  FaCalendarAlt
+  FaCalendarAlt,
+  FaPlus
 } from 'react-icons/fa'
 import BarcodeScanner from '../components/BarcodeScanner'
+import CameraBarcodeScanner from './CameraBarcodeScanner'
 
 interface AnimationState {
   firstIndex: number;
@@ -83,40 +86,70 @@ const MobileReceive = () => {
     try {
       console.log('🔎 checkProduct iniciado para código:', barcodeValue);
       setLoading(true)
+      
+      let productFound = false
+      
+      // Passo 1: Consultar a base de dados Supabase (produtos ativos)
       const product = await getProductByBarcode(barcodeValue)
       console.log('📦 Resultado da busca:', product ? 'Produto encontrado' : 'Produto não encontrado');
       
+      // Se encontrou no Supabase, use o nome de lá com prioridade
       if (product) {
         // Produto encontrado no banco de dados ativo
         setExistingProduct(product)
         setProductName(product.name)
         setCategoryId(product.category_id)
+        productFound = true
         
         // Alerta para produto já cadastrado
         setMessage({
           type: 'success',
           text: `Produto já cadastrado: ${product.name}`
         })
-      } else {
-        // Produto não encontrado no banco ativo, verificar no histórico
+      }
+      
+      // Passo 2: Verificar no histórico de produtos excluídos
+      if (!productFound) {
         const historicalProduct = await getProductHistoryByBarcode(barcodeValue);
         
         if (historicalProduct) {
           // Produto encontrado no histórico (foi excluído anteriormente)
           setExistingProduct(null)
           setProductName(historicalProduct.name)
+          productFound = true
           // Categoria precisa ser selecionada manualmente já que não temos essa info no histórico
           
           setMessage({
             type: 'success',
             text: `Produto encontrado no histórico: ${historicalProduct.name}`
           })
-        } else {
-          // Produto realmente novo
-          setExistingProduct(null)
-          setProductName('') // Limpar nome para produto novo
-          setMessage(null)
         }
+      }
+      
+      // Passo 3: Buscar dados na API do Open Food Facts (como último recurso)
+      if (!productFound) {
+        const openFoodFactsData = await fetchProductFromOpenFoodFacts(barcodeValue)
+        const productNameFromAPI = getProductName(openFoodFactsData)
+        
+        if (productNameFromAPI) {
+          // Produto encontrado na API do Open Food Facts
+          setExistingProduct(null)
+          setProductName(productNameFromAPI)
+          productFound = true
+          
+          setMessage({
+            type: 'success',
+            text: `Produto identificado pela API Open Food Facts: ${productNameFromAPI}`
+          })
+        }
+      }
+      
+      // Se não encontrou em nenhuma das fontes
+      if (!productFound) {
+        // Produto realmente novo
+        setExistingProduct(null)
+        setProductName('') // Limpar nome para produto novo
+        setMessage(null)
       }
       
       // Definir data de validade padrão como vazia para o novo sistema
@@ -885,9 +918,8 @@ const MobileReceive = () => {
           
           {/* Scanner de código de barras com câmera */}
           {isCameraOpen && (
-            <BarcodeScanner 
-              onBarcodeDetected={handleBarcodeDetected}
-              onClose={handleCameraClose}
+            <CameraBarcodeScanner 
+              onDetect={handleBarcodeDetected}
             />
           )}
         </div>
