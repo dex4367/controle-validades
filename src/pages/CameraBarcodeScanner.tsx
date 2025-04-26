@@ -154,6 +154,9 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
   };
 
   useEffect(() => {
+    // Iniciar scanner automaticamente quando o componente for montado
+    startScanner();
+    
     return () => {
       // Função de limpeza quando o componente é desmontado
       stopScanner();
@@ -179,14 +182,7 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
       <div className="scanner-content">
         {!scanning ? (
           <div className="scanner-instructions">
-            <p>Aponte a câmera para o código de barras do produto para escanear automaticamente.</p>
-            <button 
-              className="start-button" 
-              onClick={startScanner}
-              style={{backgroundColor: '#008000'}}
-            >
-              <FaCamera className="mr-2" /> Iniciar Scanner
-            </button>
+            <p>Aguarde, acessando a câmera...</p>
           </div>
         ) : (
           <div className="scanner-active">
