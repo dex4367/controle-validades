@@ -11,7 +11,7 @@ import {
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
+import '../styles/datepicker.css'
 // Importando ícones modernos
 import {
   FaFilePdf,
