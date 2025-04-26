@@ -1,4 +1,43 @@
-"node_modules/" 
-".env" 
-"node_modules/"  ".env" 
-node_modules
+# Dependências
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+/dist
+/build
+/.next/
+/out/
+
+# Cache
+.npm
+.eslintcache
+.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ambiente
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.pem
+
+# Vite
+.vite/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
