@@ -144,7 +144,7 @@ const MobileReceive = () => {
             
             setMessage({
               type: 'success',
-              text: `Produto identificado pela API Open Food Facts: ${productNameFromAPI}`
+              text: `Produto identificado: ${productNameFromAPI}`
             });
             console.log('📡 Produto identificado com sucesso pela API:', productNameFromAPI);
           } else {
