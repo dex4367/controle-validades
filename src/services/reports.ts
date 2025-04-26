@@ -25,7 +25,7 @@ export function exportToExcel(data: any[], options: ExportOptions = {}): void {
   XLSX.writeFile(wb, `${fileName}.xlsx`);
 }
 
-export function generateProductsReport(products: any[], isExpiredParam = false): void {
+export function generateProductsReport(products: any[], isExpiredParam = false, dateRangeDescription = ''): void {
   // Formatar os dados para o Excel
   const data = products.map(product => ({
     'Nome do Produto': product.name,
@@ -54,18 +54,13 @@ export function generateProductsReport(products: any[], isExpiredParam = false):
 
   // Gerar e baixar o arquivo
   const reportName = isExpiredParam ? 'produtos_vencidos' : 'todos_produtos';
-  XLSX.writeFile(workbook, `${reportName}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const fileName = `${reportName}${dateRangeDescription.replace(/[\/]/g, '-')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+  XLSX.writeFile(workbook, fileName);
 }
 
-export function generateExpiringProductsReport(products: any[], days: number): void {
-  // Filtrar produtos que vencem em X dias
-  const expiringProducts = products.filter(product => {
-    const daysRemaining = calculateDaysRemaining(product.expiry_date);
-    return !isExpired(product.expiry_date) && daysRemaining <= days;
-  });
-
+export function generateExpiringProductsReport(products: any[], days: number, dateRangeDescription = ''): void {
   // Formatar os dados para o Excel
-  const data = expiringProducts.map(product => {
+  const data = products.map(product => {
     const daysRemaining = calculateDaysRemaining(product.expiry_date);
     return {
       'Nome do Produto': product.name,
@@ -94,7 +89,8 @@ export function generateExpiringProductsReport(products: any[], days: number): v
   worksheet['!cols'] = wscols;
 
   // Gerar e baixar o arquivo
-  XLSX.writeFile(workbook, `produtos_vencendo_em_${days}_dias_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const fileName = `produtos_vencendo_em_${days}_dias${dateRangeDescription.replace(/[\/]/g, '-')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+  XLSX.writeFile(workbook, fileName);
 }
 
 export function exportFilteredProducts(products: any[], filterDescription: string): string {

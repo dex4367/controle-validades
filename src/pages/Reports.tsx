@@ -10,6 +10,8 @@ import {
 } from '../services'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
 // Importando ícones modernos
 import {
   FaFilePdf,
@@ -62,6 +64,10 @@ const Reports = () => {
     expiringIn60: 0,
     expiringIn90: 0
   })
+  // Novos estados para o filtro de datas
+  const [startDate, setStartDate] = useState<Date | null>(null)
+  const [endDate, setEndDate] = useState<Date | null>(null)
+  const [showCalendar, setShowCalendar] = useState(false)
 
   useEffect(() => {
     fetchProducts()
@@ -106,10 +112,18 @@ const Reports = () => {
         break;
     }
     
+    // Aplicar filtro de datas se ambas as datas estiverem selecionadas
+    if (startDate && endDate) {
+      tempFiltered = tempFiltered.filter(product => {
+        const expiryDate = new Date(product.expiry_date);
+        return expiryDate >= startDate && expiryDate <= endDate;
+      });
+    }
+    
     // Aplicar deduplicação por código de barras
     const deduplicated = deduplicateProductsByBarcode(tempFiltered);
     setFilteredProducts(deduplicated);
-  }, [selectedReportType, products]);
+  }, [selectedReportType, products, startDate, endDate]);
 
   const fetchProducts = async () => {
     try {
@@ -160,14 +174,21 @@ const Reports = () => {
 
   const handleGenerateReport = () => {
     if (selectedReportType === 'all') {
-      generateProductsReport(products);
+      generateProductsReport(filteredProducts, false, getDateRangeDescription());
     } else if (selectedReportType === 'expired') {
-      generateProductsReport(filteredProducts, true);
+      generateProductsReport(filteredProducts, true, getDateRangeDescription());
     } else if (selectedReportType === 'expiring7') {
-      generateExpiringProductsReport(products, 7);
+      generateExpiringProductsReport(filteredProducts, 7, getDateRangeDescription());
     } else if (selectedReportType === 'expiring30') {
-      generateExpiringProductsReport(products, 30);
+      generateExpiringProductsReport(filteredProducts, 30, getDateRangeDescription());
     }
+  }
+
+  const getDateRangeDescription = () => {
+    if (startDate && endDate) {
+      return ` (${startDate.toLocaleDateString('pt-BR')} a ${endDate.toLocaleDateString('pt-BR')})`;
+    }
+    return '';
   }
 
   const handleGeneratePdfReport = () => {
@@ -182,7 +203,7 @@ const Reports = () => {
     doc.text(title, 14, 22);
     doc.setFontSize(11);
     doc.setTextColor(100);
-    doc.text(`Relatório gerado em: ${date}`, 14, 29);
+    doc.text(`Relatório gerado em: ${date}${getDateRangeDescription()}`, 14, 29);
 
     // Cabeçalhos da tabela (com Código de Barras)
     const tableColumn = ["Código", "Nome", "Categoria", "Validade"];
@@ -290,6 +311,33 @@ const Reports = () => {
     setShowConfirmDialog(false);
   };
 
+  // Função para formatar as datas para exibição
+  const formatDateRange = () => {
+    if (!startDate && !endDate) return 'Selecione um período';
+    
+    const formatDate = (date: Date | null) => {
+      if (!date) return '';
+      
+      const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+      const day = date.getDate();
+      const month = date.toLocaleString('pt-BR', { month: 'short' });
+      
+      return `${days[date.getDay()]} ${day} ${month}`;
+    };
+    
+    if (startDate && endDate) {
+      return `${formatDate(startDate)} — ${formatDate(endDate)}`;
+    }
+    
+    return startDate ? formatDate(startDate) : formatDate(endDate);
+  };
+
+  // Função para limpar as datas
+  const clearDates = () => {
+    setStartDate(null);
+    setEndDate(null);
+  };
+
   if (loading) {
     return <div className="text-center p-6">Carregando...</div>
   }
@@ -312,6 +360,64 @@ const Reports = () => {
           {notification.message}
         </div>
       )}
+
+      {/* Filtro de período */}
+      <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+        <h3 className="text-lg font-semibold text-brmania-dark mb-3 flex items-center">
+          <FaCalendarAlt className="mr-2 text-brmania-green" /> Filtrar por período
+        </h3>
+        
+        <div className="relative">
+          <div 
+            className="p-3 border rounded-md cursor-pointer flex justify-between items-center"
+            onClick={() => setShowCalendar(!showCalendar)}
+          >
+            <div className="flex items-center">
+              <FaCalendarAlt className="text-gray-400 mr-2" />
+              <span>{formatDateRange()}</span>
+            </div>
+            {(startDate || endDate) && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearDates();
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <FaTimes />
+              </button>
+            )}
+          </div>
+          
+          {showCalendar && (
+            <div className="absolute z-10 mt-2 bg-white shadow-lg rounded-md p-4">
+              <DatePicker
+                selected={startDate}
+                onChange={(dates) => {
+                  const [start, end] = dates as [Date, Date];
+                  setStartDate(start);
+                  setEndDate(end);
+                  if (start && end) {
+                    setShowCalendar(false);
+                  }
+                }}
+                startDate={startDate}
+                endDate={endDate}
+                selectsRange
+                inline
+                monthsShown={2}
+                dateFormat="dd/MM/yyyy"
+              />
+            </div>
+          )}
+        </div>
+        
+        {(startDate || endDate) && (
+          <div className="mt-2 text-sm text-brmania-green">
+            Filtrando produtos com vencimento entre {startDate?.toLocaleDateString('pt-BR')} e {endDate?.toLocaleDateString('pt-BR')}
+          </div>
+        )}
+      </div>
 
       {/* Estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
