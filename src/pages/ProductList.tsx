@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { getProducts, deleteProduct } from '../services/supabase'
 import { isExpired, calculateDaysRemaining } from '../utils/dateUtils'
-import { exportFilteredProducts } from '../services/reports'
 // Importando ícones modernos
 import {
   FaPlus,
@@ -15,7 +14,6 @@ import {
   FaSortNumericUp,
   FaEdit,
   FaTrash,
-  FaFileExcel,
   FaExclamationTriangle,
   FaTimes
 } from 'react-icons/fa'
@@ -48,7 +46,6 @@ const ProductList = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [sortBy, setSortBy] = useState<'name' | 'expiry_date'>('expiry_date')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
-  const [exportLoading, setExportLoading] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [productToDelete, setProductToDelete] = useState<{id: number, name: string} | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -196,47 +193,6 @@ const ProductList = () => {
     }
   };
 
-  // Exportar produtos filtrados para Excel
-  const handleExportFilteredProducts = () => {
-    setExportLoading(true);
-    
-    try {
-      // Construir descrição do filtro aplicado
-      let filterDescription = 'Todos os produtos';
-      
-      if (searchTerm) {
-        filterDescription = `Busca por: "${searchTerm}"`;
-      }
-      
-      if (selectedCategory !== 'all') {
-        filterDescription += (filterDescription !== 'Todos os produtos' ? ' + ' : '') + 
-          `Categoria: ${selectedCategory}`;
-      }
-      
-      if (statusFilter !== 'all') {
-        const statusText = {
-          'valid': 'Produtos válidos',
-          'expired': 'Produtos vencidos',
-          'next7days': 'Vencendo em 7 dias',
-          'next30days': 'Vencendo em 30 dias',
-          'next60days': 'Vencendo em 60 dias'
-        }[statusFilter];
-        
-        filterDescription += (filterDescription !== 'Todos os produtos' ? ' + ' : '') + 
-          `Status: ${statusText}`;
-      }
-      
-      // Exportar produtos
-      exportFilteredProducts(sortedProducts, filterDescription);
-      
-    } catch (error) {
-      console.error('Erro ao exportar produtos:', error);
-      alert('Erro ao exportar produtos para Excel');
-    } finally {
-      setExportLoading(false);
-    }
-  };
-
   if (loading) {
     return <div className="text-center p-6">Carregando...</div>
   }
@@ -318,19 +274,6 @@ const ProductList = () => {
           <p className="text-sm text-brmania-dark">
             {filteredProducts.length} produtos encontrados
           </p>
-          
-          <button
-            onClick={handleExportFilteredProducts}
-            disabled={exportLoading || filteredProducts.length === 0}
-            className={`flex items-center text-sm px-3 py-1 rounded 
-              ${exportLoading || filteredProducts.length === 0
-                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                : 'bg-brmania-green text-white hover:bg-brmania-green/90'
-              }`}
-          >
-            <FaFileExcel className="mr-1" />
-            {exportLoading ? 'Exportando...' : 'Exportar para Excel'}
-          </button>
         </div>
 
         {/* Tabela de produtos */}
