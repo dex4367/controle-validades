@@ -73,6 +73,49 @@ const Reports = () => {
     fetchProducts()
   }, [])
 
+  // Novo useEffect para recalcular as estatísticas quando o filtro de data for alterado
+  useEffect(() => {
+    if (products.length > 0) {
+      // Filtrar produtos com base nas datas selecionadas
+      let filteredByDate = [...products];
+      
+      if (startDate && endDate) {
+        filteredByDate = products.filter(product => {
+          const expiryDate = new Date(product.expiry_date);
+          return expiryDate >= startDate && expiryDate <= endDate;
+        });
+      }
+      
+      // Recalcular estatísticas com os produtos filtrados
+      const expired = filteredByDate.filter(product => isExpired(product.expiry_date)).length;
+      const expiringIn7 = filteredByDate.filter(product => {
+        const days = calculateDaysRemaining(product.expiry_date);
+        return !isExpired(product.expiry_date) && days <= 7;
+      }).length;
+      const expiringIn30 = filteredByDate.filter(product => {
+        const days = calculateDaysRemaining(product.expiry_date);
+        return !isExpired(product.expiry_date) && days <= 30;
+      }).length;
+      const expiringIn60 = filteredByDate.filter(product => {
+        const days = calculateDaysRemaining(product.expiry_date);
+        return !isExpired(product.expiry_date) && days <= 60;
+      }).length;
+      const expiringIn90 = filteredByDate.filter(product => {
+        const days = calculateDaysRemaining(product.expiry_date);
+        return !isExpired(product.expiry_date) && days <= 90;
+      }).length;
+      
+      setStats({
+        total: filteredByDate.length,
+        expired,
+        expiringIn7,
+        expiringIn30,
+        expiringIn60,
+        expiringIn90
+      });
+    }
+  }, [startDate, endDate, products]);
+
   useEffect(() => {
     if (!products || products.length === 0) return;
     
