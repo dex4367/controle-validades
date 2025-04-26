@@ -22,76 +22,24 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
   const scanIntervalRef = useRef<number | null>(null);
   const processingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
-  const [cameraCapabilities, setCameraCapabilities] = useState<{
-    width: number;
-    height: number;
-  }>({ width: 1280, height: 720 }); // Valor padrão de alta resolução
-  
-  // Detecta as capacidades máximas da câmera
-  useEffect(() => {
-    async function getMaxCameraResolution() {
-      try {
-        // Tenta obter a câmera com a maior resolução possível
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment',
-            width: { ideal: 4096 }, // Requisita o máximo
-            height: { ideal: 2160 }, // Requisita o máximo
-          }
-        });
-        
-        // Obtém as configurações reais que foram aceitas
-        const videoTrack = stream.getVideoTracks()[0];
-        const capabilities = videoTrack.getCapabilities();
-        const settings = videoTrack.getSettings();
-        
-        // Vamos usar a resolução que o dispositivo realmente nos deu
-        let bestWidth = settings.width || 1280;
-        let bestHeight = settings.height || 720;
-        
-        console.log('Câmera iniciada com resolução:', bestWidth, 'x', bestHeight);
-        
-        // Limpa o stream de detecção
-        stream.getTracks().forEach(track => track.stop());
-        
-        // Atualiza o estado com as melhores configurações
-        setCameraCapabilities({
-          width: bestWidth,
-          height: bestHeight
-        });
-      } catch (error) {
-        console.error('Erro ao detectar resolução máxima:', error);
-        // Mantém a resolução padrão em caso de erro
-      }
-    }
-    
-    getMaxCameraResolution();
-  }, []);
   
   // Inicializa o scanner de código de barras quando a câmera está pronta
   useEffect(() => {
     if (!isCameraReady) return;
     
-    // Configuração otimizada para desempenho e precisão
+    // Configuração otimizada para desempenho
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8, 
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.CODE_93,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
-      BarcodeFormat.CODABAR,
-      BarcodeFormat.ITF
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.CODE_128
     ]);
-    hints.set(DecodeHintType.TRY_HARDER, true); // Mais preciso, mesmo que um pouco mais lento
-    hints.set(DecodeHintType.ASSUME_GS1, false);
+    hints.set(DecodeHintType.TRY_HARDER, false);
     
     const codeReader = new BrowserMultiFormatReader(hints);
     let stopScanning = false;
     
-    // Função de escaneamento aprimorada
+    // Função de escaneamento
     const scanBarcode = async () => {
       if (stopScanning || !webcamRef.current || processingRef.current) return;
       processingRef.current = true;
@@ -103,38 +51,29 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
           return;
         }
         
-        // Método direto quando disponível (mais rápido e preciso)
+        // Método direto quando disponível
         if (codeReader.decodeFromVideoElement) {
           codeReader.decodeFromVideoElement(video)
             .then(result => {
               if (result && result.getText()) {
-                // Verificar qualidade do código lido (comprimento esperado, etc)
-                const text = result.getText().trim();
+                onBarcodeDetected(result.getText());
+                stopScanning = true;
                 
-                // Verificação básica de qualidade para evitar falsas leituras
-                if (text.length >= 8) {
-                  console.log('Código detectado:', text);
-                  onBarcodeDetected(text);
-                  stopScanning = true;
-                  
-                  // Liberar recursos da câmera
-                  if (streamRef.current) {
-                    streamRef.current.getTracks().forEach(track => track.stop());
-                  }
+                // Liberar recursos da câmera
+                if (streamRef.current) {
+                  streamRef.current.getTracks().forEach(track => track.stop());
                 }
               }
             })
-            .catch(() => {
-              // Silencia erros normais de não-detecção
-            })
+            .catch(() => {})
             .finally(() => {
               processingRef.current = false;
             });
         } else {
-          // Fallback para screenshot com alta qualidade
+          // Fallback para screenshot
           const screenshot = webcamRef.current.getScreenshot({
-            width: cameraCapabilities.width,
-            height: cameraCapabilities.height
+            width: 320,
+            height: 240
           });
           
           if (screenshot) {
@@ -143,24 +82,16 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
               codeReader.decodeFromImage(image)
                 .then(result => {
                   if (result && result.getText()) {
-                    const text = result.getText().trim();
+                    onBarcodeDetected(result.getText());
+                    stopScanning = true;
                     
-                    // Verificação básica de qualidade
-                    if (text.length >= 8) {
-                      console.log('Código detectado (via screenshot):', text);
-                      onBarcodeDetected(text);
-                      stopScanning = true;
-                      
-                      // Liberar recursos da câmera
-                      if (streamRef.current) {
-                        streamRef.current.getTracks().forEach(track => track.stop());
-                      }
+                    // Liberar recursos da câmera
+                    if (streamRef.current) {
+                      streamRef.current.getTracks().forEach(track => track.stop());
                     }
                   }
                 })
-                .catch(() => {
-                  // Silencia erros normais de não-detecção
-                })
+                .catch(() => {})
                 .finally(() => {
                   processingRef.current = false;
                 });
@@ -171,23 +102,15 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
           }
         }
       } catch (e) {
-        console.error('Erro durante o escaneamento:', e);
         processingRef.current = false;
       }
     };
     
-    // Estratégia de escaneamento em três camadas para máxima sensibilidade
-    // 1. Escaneamento contínuo de fundo
-    scanIntervalRef.current = window.setInterval(scanBarcode, 200);
+    // Estratégia em duas camadas: normal e rápida
+    scanIntervalRef.current = window.setInterval(scanBarcode, 150);
     
-    // 2. Escaneamento rápido por 5 segundos (mais intensivo no início)
-    const mediumScanInterval = window.setInterval(scanBarcode, 100);
-    setTimeout(() => {
-      if (mediumScanInterval) clearInterval(mediumScanInterval);
-    }, 5000);
-    
-    // 3. Modo super-rápido para os 3 primeiros segundos
-    const fastScanInterval = window.setInterval(scanBarcode, 40);
+    // Modo rápido inicial por 3 segundos
+    const fastScanInterval = window.setInterval(scanBarcode, 50);
     setTimeout(() => {
       if (fastScanInterval) clearInterval(fastScanInterval);
     }, 3000);
@@ -198,9 +121,6 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current);
       }
-      if (mediumScanInterval) {
-        clearInterval(mediumScanInterval);
-      }
       if (fastScanInterval) {
         clearInterval(fastScanInterval);
       }
@@ -210,38 +130,28 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [isCameraReady, onBarcodeDetected, cameraCapabilities]);
+  }, [isCameraReady, onBarcodeDetected]);
 
   // Handler para quando a câmera está pronta
   const handleUserMedia = (stream: MediaStream) => {
     streamRef.current = stream;
     setIsCameraReady(true);
     
-    // Configura foco automático e outras otimizações quando disponíveis
+    // Configura foco automático quando disponível
     try {
       const videoTrack = stream.getVideoTracks()[0];
-      
       if (videoTrack && typeof videoTrack.applyConstraints === 'function') {
-        // Obter capacidades disponíveis
-        const capabilities = videoTrack.getCapabilities();
-        console.log('Capacidades da câmera:', capabilities);
-        
-        // Usar apenas capacidades suportadas padrão (ignorando focusMode que é experimental)
-        try {
-          // Em vez de tentar usar focusMode diretamente (não é padrão),
-          // vamos confiar na configuração automática do navegador
-          videoTrack.applyConstraints({
-            advanced: [{}] // Aplica configurações avançadas sem especificar propriedades específicas
-          }).catch((e) => {
-            console.log('Erro ao aplicar configurações avançadas:', e);
-          });
-        } catch (e) {
-          console.log('Erro ao configurar a câmera:', e);
-        }
+        videoTrack.applyConstraints({
+          advanced: [{ 
+            // @ts-ignore - focusMode é suportado em navegadores modernos
+            focusMode: 'continuous' 
+          }]
+        }).catch(() => {
+          // Ignora erros de compatibilidade
+        });
       }
     } catch (e) {
       // Ignora erros de compatibilidade
-      console.log('Erro ao configurar a câmera:', e);
     }
   };
 
@@ -254,22 +164,22 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden w-full max-w-md mx-4">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden w-full max-w-sm mx-4">
         {/* Cabeçalho */}
-        <div className="flex justify-between items-center p-3 bg-brmania-green text-white">
-          <h3 className="text-base font-medium px-1">Scanner de Código de Barras</h3>
+        <div className="flex justify-between items-center p-2 bg-brmania-green text-white">
+          <h3 className="text-sm font-medium px-1">Scanner BR Mania</h3>
           <button 
             onClick={onClose}
             className="text-white p-1 rounded-full hover:bg-green-700"
             aria-label="Fechar"
           >
-            <FaTimes size={18} />
+            <FaTimes size={14} />
           </button>
         </div>
 
         {/* Área da câmera ou mensagem de erro */}
         {error ? (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-1 text-xs">
             {error}
           </div>
         ) : (
@@ -278,13 +188,13 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
               ref={webcamRef}
               audio={false}
               screenshotFormat="image/jpeg"
-              screenshotQuality={0.7} // Qualidade mais alta para melhor detecção
+              screenshotQuality={0.3}
               videoConstraints={{
                 facingMode: 'environment',
-                width: { min: 640, ideal: cameraCapabilities.width, max: cameraCapabilities.width },
-                height: { min: 480, ideal: cameraCapabilities.height, max: cameraCapabilities.height },
+                width: { min: 320, ideal: 640, max: 640 },
+                height: { min: 240, ideal: 480, max: 480 },
                 aspectRatio: 4/3,
-                frameRate: { ideal: 30, max: 60 }, // Taxa de quadros mais alta para melhor captura
+                frameRate: { ideal: 15, max: 20 },
               }}
               onUserMedia={handleUserMedia}
               onUserMediaError={handleUserMediaError}
@@ -294,12 +204,12 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
             
             {/* Guia de escaneamento */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="relative w-72 h-40 border-2 border-yellow-400 rounded-lg overflow-hidden">
+              <div className="relative w-64 h-32 border-2 border-yellow-400 rounded-lg overflow-hidden">
                 {/* Cantos do guia */}
-                <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-yellow-400 -mt-0.5 -ml-0.5"></div>
-                <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-yellow-400 -mt-0.5 -mr-0.5"></div>
-                <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-yellow-400 -mb-0.5 -ml-0.5"></div>
-                <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-yellow-400 -mb-0.5 -mr-0.5"></div>
+                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-yellow-400 -mt-0.5 -ml-0.5"></div>
+                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-yellow-400 -mt-0.5 -mr-0.5"></div>
+                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-yellow-400 -mb-0.5 -ml-0.5"></div>
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-yellow-400 -mb-0.5 -mr-0.5"></div>
                 
                 {/* Linha de escaneamento */}
                 <div style={{
@@ -319,7 +229,7 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
             <div className="absolute bottom-2 left-0 right-0 flex justify-center">
               <div className="bg-black bg-opacity-70 px-3 py-1 rounded-full">
                 <p className="text-white text-xs">
-                  Alinhe o código no retângulo
+                  Posicione o código no retângulo
                 </p>
               </div>
             </div>
@@ -327,10 +237,10 @@ const BarcodeScanner = ({ onBarcodeDetected, onClose }: BarcodeScannerProps) => 
         )}
 
         {/* Botão de cancelar */}
-        <div className="p-3 bg-yellow-50 flex justify-center">
+        <div className="p-1 bg-yellow-50 flex justify-center">
           <button 
             onClick={onClose}
-            className="bg-brmania-green text-white px-6 py-2 rounded text-sm font-medium hover:bg-green-700"
+            className="bg-brmania-green text-white px-4 py-1 rounded text-xs font-medium hover:bg-green-700"
           >
             Cancelar
           </button>
