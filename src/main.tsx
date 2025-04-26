@@ -9,9 +9,7 @@ import './index.css'
  * Inicializa o roteamento e o componente principal
  */
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>,
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
 ) 
