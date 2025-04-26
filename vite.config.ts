@@ -15,7 +15,20 @@ export default defineConfig({
           ['@babel/plugin-transform-typescript', { allowNamespaces: true, isTSX: true }]
         ]
       }
-    })
+    }),
+    {
+      name: 'disable-browser-alert',
+      transform(code) {
+        // Interceptar alertas do browser e desabilitá-los
+        if (code.includes('window.alert') || code.includes('alert(')) {
+          return code.replace(
+            /(window\.)?alert\(/g, 
+            'console.log('
+          );
+        }
+        return code;
+      },
+    },
   ],
   build: {
     // Pular a verificação TypeScript durante o build

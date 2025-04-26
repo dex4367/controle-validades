@@ -62,21 +62,33 @@ export const fetchProductFromOpenFoodFacts = async (barcode: string): Promise<Op
     // URL da API do Open Food Facts
     const url = `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`;
     
-    console.log('Consultando API do Open Food Facts:', url);
+    console.log('🔍 Consultando API do Open Food Facts:', url);
     
     const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error('❌ Erro na resposta da API:', response.status, response.statusText);
+      return null;
+    }
+    
     const data: OpenFoodFactsResponse = await response.json();
     
-    console.log('Resposta da API do Open Food Facts:', data);
+    console.log('✅ Resposta da API do Open Food Facts status:', data.status);
+    console.log('🏷️ Produto encontrado:', data.product ? 'Sim' : 'Não');
+    
+    if (data.product && data.product.product_name) {
+      console.log('📦 Nome do produto:', data.product.product_name);
+      console.log('📦 Nome do produto em PT:', data.product.product_name_pt || 'Não disponível');
+    }
     
     // Verifica se a API encontrou o produto
-    if (data.status === 1) {
+    if (data.status === 1 && data.product) {
       return data.product;
     }
     
     return null;
   } catch (error) {
-    console.error('Erro ao buscar produto na API do Open Food Facts:', error);
+    console.error('🛑 Erro ao buscar produto na API do Open Food Facts:', error);
     return null;
   }
 };

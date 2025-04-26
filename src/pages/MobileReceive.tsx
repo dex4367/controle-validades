@@ -128,19 +128,30 @@ const MobileReceive = () => {
       
       // Passo 3: Buscar dados na API do Open Food Facts (como último recurso)
       if (!productFound) {
-        const openFoodFactsData = await fetchProductFromOpenFoodFacts(barcodeValue)
-        const productNameFromAPI = getProductName(openFoodFactsData)
-        
-        if (productNameFromAPI) {
-          // Produto encontrado na API do Open Food Facts
-          setExistingProduct(null)
-          setProductName(productNameFromAPI)
-          productFound = true
+        try {
+          console.log('📡 Buscando na API Open Food Facts para o código:', barcodeValue);
+          const openFoodFactsData = await fetchProductFromOpenFoodFacts(barcodeValue);
+          console.log('📡 Resposta da API Open Food Facts:', openFoodFactsData);
           
-          setMessage({
-            type: 'success',
-            text: `Produto identificado pela API Open Food Facts: ${productNameFromAPI}`
-          })
+          const productNameFromAPI = getProductName(openFoodFactsData);
+          console.log('📡 Nome do produto obtido da API:', productNameFromAPI);
+          
+          if (productNameFromAPI) {
+            // Produto encontrado na API do Open Food Facts
+            setExistingProduct(null);
+            setProductName(productNameFromAPI);
+            productFound = true;
+            
+            setMessage({
+              type: 'success',
+              text: `Produto identificado pela API Open Food Facts: ${productNameFromAPI}`
+            });
+            console.log('📡 Produto identificado com sucesso pela API:', productNameFromAPI);
+          } else {
+            console.log('📡 API não retornou um nome de produto válido');
+          }
+        } catch (apiError) {
+          console.error('📡 Erro ao consultar a API Open Food Facts:', apiError);
         }
       }
       

@@ -105,9 +105,21 @@ const ProductForm = () => {
     } else {
       // Verificar se veio código de barras via state (da página de scanner)
       const barcodeFromScanner = location.state?.barcode
+      const productNameFromAPI = location.state?.productName
+      
       if (barcodeFromScanner) {
-        setProduct(prev => ({ ...prev, barcode: barcodeFromScanner }))
-        handleBarcodeSearch(barcodeFromScanner)
+        // Atualizar o código de barras
+        setProduct(prev => ({ 
+          ...prev, 
+          barcode: barcodeFromScanner,
+          // Se recebemos um nome da API, usá-lo como padrão
+          name: productNameFromAPI || prev.name 
+        }))
+        
+        // Se não temos nome da API, tentar buscar de produtos existentes
+        if (!productNameFromAPI) {
+          handleBarcodeSearch(barcodeFromScanner)
+        }
       }
     }
   }, [id, location.state])

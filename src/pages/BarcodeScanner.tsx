@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getProductsByBarcode } from '../services/supabase'
-import CameraBarcodeScanner from './CameraBarcodeScanner'
+import { getProductsByBarcode, getProductHistoryByBarcode } from '../services/supabase'
+import { fetchProductFromOpenFoodFacts, getProductName, getProductImage } from '../services/openFoodFacts'
 import { Product } from '../services'
 
 interface RiskInfo {
@@ -20,7 +20,12 @@ const BarcodeScanner = () => {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [focusInput, setFocusInput] = useState(true)
-  const [showCameraScanner, setShowCameraScanner] = useState(false)
+  const [productInfo, setProductInfo] = useState<string | null>(null)
+  const [productImage, setProductImage] = useState<string | null>(null)
+  
+  // Referência para controlar o tempo entre leituras
+  const lastKeypressTime = useRef<number>(0)
+  const keypressTimeout = useRef<NodeJS.Timeout | null>(null)
 
   // Efeitos
   useEffect(() => {
@@ -81,30 +86,61 @@ const BarcodeScanner = () => {
     try {
       setLoading(true)
       setError(null)
+      setProductInfo(null)
+      setProductImage(null)
       
+      let productFound = false
+      
+      // Passo 1: Consultar a base de dados Supabase (produtos ativos)
       const data = await getProductsByBarcode(code)
+      setProducts(data)
       
-      // Ordenar produtos por data de validade
-      const sortedProducts = [...data].sort((a, b) => {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        
-        const expiryDateA = new Date(a.expiry_date)
-        const expiryDateB = new Date(b.expiry_date)
-        expiryDateA.setHours(0, 0, 0, 0)
-        expiryDateB.setHours(0, 0, 0, 0)
-        
-        const diffDaysA = Math.ceil((expiryDateA.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-        const diffDaysB = Math.ceil((expiryDateB.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-        
-        return diffDaysA - diffDaysB
-      })
+      // Se encontrou no Supabase, use o nome de lá com prioridade
+      if (data && data.length > 0) {
+        setProductInfo(data[0].name)
+        productFound = true
+        console.log('Produto encontrado no Supabase:', data[0].name)
+      }
       
-      setProducts(sortedProducts)
+      // Passo 2: Verificar no histórico de produtos excluídos
+      if (!productFound) {
+        const historicalProduct = await getProductHistoryByBarcode(code)
+        if (historicalProduct) {
+          setProductInfo(historicalProduct.name)
+          productFound = true
+          console.log('Produto encontrado no histórico:', historicalProduct.name)
+        }
+      }
       
-      if (!data || data.length === 0) {
+      // Passo 3: Buscar dados na API do Open Food Facts (como último recurso)
+      const openFoodFactsData = await fetchProductFromOpenFoodFacts(code)
+      console.log('Dados recebidos do Open Food Facts:', openFoodFactsData)
+      
+      const productName = getProductName(openFoodFactsData)
+      const imageUrl = getProductImage(openFoodFactsData)
+      
+      console.log('Nome do produto (OpenFoodFacts):', productName)
+      console.log('URL da imagem:', imageUrl)
+      
+      // Se não encontrou no Supabase nem no histórico, mas encontrou no OpenFoodFacts
+      if (!productFound && productName) {
+        setProductInfo(productName)
+        productFound = true
+      }
+      
+      // Sempre use a imagem da API se disponível, independente da origem do nome
+      if (imageUrl) {
+        setProductImage(imageUrl)
+      }
+      
+      // Se não encontrou em nenhuma das fontes
+      if (!productFound) {
         setError('Produto não encontrado com este código de barras.')
       }
+      
+      // Após processar, limpa o campo do código para evitar acumulação
+      // Comentamos esta linha para não limpar o campo ainda, pois pode confundir o usuário
+      // setBarcode('');
     } catch (err) {
       console.error('Erro ao buscar produtos:', err)
       setError('Erro ao buscar produtos. Tente novamente.')
@@ -123,14 +159,45 @@ const BarcodeScanner = () => {
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setBarcode(e.target.value)
+    const now = Date.now()
+    const newValue = e.target.value
     
+    // Se passaram mais de 500ms desde a última tecla ou se o campo está vazio e está entrando novo conteúdo
+    // consideramos como um novo escaneamento
+    if (now - lastKeypressTime.current > 500 || barcode === '') {
+      // Limpar completamente o campo e substituir com o novo valor
+      setBarcode(newValue)
+    } else {
+      // Se for um evento muito rápido (como leitor de código de barras funciona), 
+      // adiciona ao valor atual
+      setBarcode(newValue)
+    }
+    
+    // Limpar os estados quando começa um novo escaneamento
     if (products.length > 0) {
       setProducts([])
     }
     if (error) {
       setError(null)
     }
+    if (productInfo) {
+      setProductInfo(null)
+      setProductImage(null)
+    }
+    
+    // Atualiza o tempo do último keypress
+    lastKeypressTime.current = now
+    
+    // Define um timeout para processar automaticamente o código após 300ms de inatividade
+    if (keypressTimeout.current) {
+      clearTimeout(keypressTimeout.current)
+    }
+    
+    keypressTimeout.current = setTimeout(() => {
+      if (newValue.trim() && newValue.length > 7) {
+        fetchProducts(newValue.trim())
+      }
+    }, 300)
   }
 
   const handleSearchClick = () => {
@@ -144,27 +211,19 @@ const BarcodeScanner = () => {
     setProducts([])
     setError(null)
     setFocusInput(true)
+    setProductInfo(null)
+    setProductImage(null)
   }
 
   const handleCreateProduct = () => {
     if (barcode) {
-      navigate('/products/new', { state: { barcode: barcode.trim() } })
+      navigate('/products/new', { 
+        state: { 
+          barcode: barcode.trim(),
+          productName: productInfo || '' 
+        } 
+      })
     }
-  }
-
-  const handleUpdateProduct = (productId: number) => {
-    navigate(`/products/edit/${productId}`)
-  }
-
-  const handleBarcodeDetected = (detectedBarcode: string) => {
-    setShowCameraScanner(false)
-    setBarcode(detectedBarcode)
-    fetchProducts(detectedBarcode)
-  }
-
-  // Renderização condicional com câmera
-  if (showCameraScanner) {
-    return <CameraBarcodeScanner onDetect={handleBarcodeDetected} />
   }
 
   return (
@@ -184,6 +243,10 @@ const BarcodeScanner = () => {
               value={barcode}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onFocus={(e) => {
+                // Ao receber foco, selecionar todo o conteúdo para facilitar substituição
+                e.target.select()
+              }}
               autoFocus
               className="flex-1 p-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500"
               placeholder="Escaneie ou digite o código de barras"
@@ -210,138 +273,64 @@ const BarcodeScanner = () => {
           </div>
         )}
 
-        {/* Mensagem de erro */}
-        {error && !loading && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
-            <strong className="font-bold">Erro:</strong>
-            <span className="block sm:inline"> {error}</span>
-          </div>
-        )}
-
-        {/* Resultado da busca */}
-        {products.length > 0 && !loading && (
-          <div className="border border-green-200 rounded-lg p-4 bg-green-50">
-            <h3 className="text-lg font-semibold text-green-800 mb-2">
-              {products.length === 1 
-                ? 'Produto encontrado!' 
-                : `${products.length} produtos encontrados!`}
+        {/* Interface simplificada: Apenas nome do produto e botão de cadastrar */}
+        {productInfo && !loading && (
+          <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+            {productImage ? (
+              <div className="flex justify-center mb-4">
+                <img 
+                  src={productImage} 
+                  alt={productInfo} 
+                  className="h-48 object-contain rounded-md border border-gray-200 shadow-sm"
+                  onLoad={() => console.log('Imagem carregada com sucesso')}
+                  onError={(e) => {
+                    console.error('Erro ao carregar imagem:', e)
+                    const target = e.target as HTMLImageElement
+                    target.style.display = 'none'
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="flex justify-center mb-4 h-48 items-center border border-gray-200 rounded-md bg-gray-50">
+                <p className="text-gray-400">Imagem não disponível</p>
+              </div>
+            )}
+            <h3 className="text-xl font-semibold text-blue-800 mb-4 text-center">
+              {productInfo}
             </h3>
-            
-            <div className="space-y-4 mb-4">
-              {products.map(product => {
-                const risk = calculateRisk(product.expiry_date);
-                return (
-                  <div key={product.id} className={`border rounded-md p-3 ${risk.color}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-2">
-                        <div className="flex">
-                          <span className="font-medium w-32">Nome:</span>
-                          <span>{product.name}</span>
-                        </div>
-                        <div className="flex">
-                          <span className="font-medium w-32">Categoria:</span>
-                          <span>{product.categories?.name || 'N/A'}</span>
-                        </div>
-                        <div className="flex">
-                          <span className="font-medium w-32">Validade:</span>
-                          <span className={risk.textColor}>
-                            {new Date(product.expiry_date).toLocaleDateString('pt-BR')}
-                          </span>
-                        </div>
-                        <div className="mt-2">
-                          <button
-                            onClick={() => handleUpdateProduct(product.id)}
-                            className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                          >
-                            Editar produto
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <span className={`${risk.badge} text-white text-xs font-bold px-2 py-1 rounded-full`}>
-                          {risk.level}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            <div className="flex space-x-2 mt-4">
-              <button
-                onClick={handleClear}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Escanear outro
-              </button>
-            </div>
           </div>
         )}
 
-        {/* Se buscou mas não encontrou, mostrar opção de cadastrar */}
-        {products.length === 0 && error && !loading && (
+        {/* Opção de cadastrar para produtos não encontrados */}
+        {!loading && barcode && !productInfo && (
           <div className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
-            <h3 className="text-lg font-semibold text-yellow-800 mb-2">Produto não encontrado</h3>
-            <p className="mb-4">Deseja cadastrar um novo produto com este código de barras?</p>
-            
-            <div className="flex space-x-2">
-              <button
-                onClick={handleClear}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreateProduct}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-              >
-                Cadastrar novo produto
-              </button>
-            </div>
+            <h3 className="text-xl font-semibold text-yellow-800 mb-2 text-center">
+              Produto não encontrado
+            </h3>
+            <p className="text-center mb-4">
+              Não foi possível identificar este código de barras.
+            </p>
           </div>
         )}
 
-        {/* Instruções */}
-        {products.length === 0 && !error && !loading && (
-          <div className="bg-blue-50 p-4 rounded-md">
-            <h4 className="font-medium text-blue-800 mb-2">Instruções:</h4>
-            <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-              <li>Conecte seu leitor de código de barras via USB ao computador</li>
-              <li>Clique no campo de texto acima para deixá-lo ativo</li>
-              <li>Escaneie o código de barras do produto</li>
-              <li>Caso tenha um leitor, você também pode digitar o código manualmente</li>
-              <li>Se o produto existir, serão exibidas suas informações</li>
-              <li>Se não existir, você terá a opção de cadastrá-lo</li>
-            </ol>
+        {/* Botões de ação */}
+        {!loading && barcode && (
+          <div className="flex space-x-2">
+            <button
+              onClick={handleCreateProduct}
+              className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center justify-center"
+            >
+              <span className="mr-2">+</span> Cadastrar Produto
+            </button>
+            <button
+              onClick={handleClear}
+              className="flex-1 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex items-center justify-center"
+            >
+              <span className="mr-2">↺</span> Limpar
+            </button>
           </div>
         )}
       </div>
-      
-      {/* Legenda dos graus de risco */}
-      {products.length > 0 && !loading && (
-        <div className="mt-4 p-4 bg-white rounded-lg shadow-md">
-          <h4 className="font-medium text-gray-800 mb-2">Legenda - Grau de Risco:</h4>
-          <ul className="space-y-2">
-            <li className="flex items-center">
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full mr-2">Vencido</span>
-              <span className="text-sm">Produto com validade expirada</span>
-            </li>
-            <li className="flex items-center">
-              <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full mr-2">Alto Risco</span>
-              <span className="text-sm">Vence em até 7 dias</span>
-            </li>
-            <li className="flex items-center">
-              <span className="bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded-full mr-2">Médio Risco</span>
-              <span className="text-sm">Vence em até 30 dias</span>
-            </li>
-            <li className="flex items-center">
-              <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full mr-2">Baixo Risco</span>
-              <span className="text-sm">Vence em mais de 30 dias</span>
-            </li>
-          </ul>
-        </div>
-      )}
     </div>
   )
 }
