@@ -41,27 +41,32 @@ body {
 
 @keyframes barcode-loading {
   0% {
-    transform: translateX(-200%);
-    opacity: 0;
+    transform: scaleY(0.6);
+    opacity: 0.3;
   }
-  15% {
+  50% {
+    transform: scaleY(1.05);
     opacity: 1;
   }
   100% {
-    transform: translateX(0);
-    opacity: 1;
+    transform: scaleY(1);
+    opacity: 0.9;
   }
 }
 
 .barcode-line {
-  animation: barcode-loading 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) forwards;
+  height: 100%;
+  transform-origin: center;
+  animation: barcode-loading 1.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+.barcode-line.animated {
+  animation-play-state: running;
 }
 
 .barcode-container {
   overflow: hidden;
   position: relative;
-  perspective: 800px;
-  transform-style: preserve-3d;
 }
 
 .barcode-digit {

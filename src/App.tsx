@@ -50,7 +50,7 @@ function App() {
   // Efeito para animar progressivamente as linhas do código de barras
   useEffect(() => {
     if (isLoading) {
-      const totalLines = 30
+      const totalLines = 10
       const interval = setInterval(() => {
         setAnimatedLines(prev => {
           const nextIndex = prev.length
@@ -60,7 +60,7 @@ function App() {
           clearInterval(interval)
           return prev
         })
-      }, 40)
+      }, 100)
 
       return () => clearInterval(interval)
     }
@@ -70,64 +70,42 @@ function App() {
   if (isLoading) {
     // Gerar as barras do código de barras com larguras variadas
     const barcodeLines = []
-    const totalLines = 30
-    let leftPosition = 10
+    const totalLines = 10
+    let leftPosition = 0
 
     for (let i = 0; i < totalLines; i++) {
-      const width = Math.floor(Math.random() * 6) + 2 // Largura entre 2px e 8px
-      const gap = Math.floor(Math.random() * 3) + 1 // Espaço entre 1px e 4px
-      const isThick = Math.random() > 0.7 // 30% de chance de ser uma barra mais grossa
-      const actualWidth = isThick ? width * 1.5 : width
-      const darkness = isThick ? 1 : 0.8 // Barras grossas são mais escuras
+      const width = Math.floor(Math.random() * 8) + 4 // Largura entre 4px e 12px
+      const gap = Math.floor(Math.random() * 6) + 6 // Espaço entre 6px e 12px
       
       barcodeLines.push({
         id: i,
-        width: actualWidth,
+        width: width,
         left: leftPosition,
-        delay: i * 0.04, // Delay crescente para cada barra
+        delay: i * 0.1, // Delay mais espaçado para animação mais suave
         isAnimated: animatedLines.includes(i),
-        darkness
       })
       
-      leftPosition += actualWidth + gap
+      leftPosition += width + gap
     }
 
     return (
-      <div className="flex items-center justify-center h-screen bg-brmania-light">
-        <div className="text-center p-6 bg-white rounded-lg shadow-md max-w-md w-full">
-          <h2 className="text-xl font-semibold mb-4 text-brmania-dark">Carregando...</h2>
-          
-          <div className="barcode-container h-20 mb-6 bg-gray-50 rounded relative">
-            {/* Barras do código de barras */}
-            {barcodeLines.map(line => (
-              <div
-                key={line.id}
-                className={`barcode-line absolute h-full ${line.isAnimated ? 'animated' : ''}`}
-                style={{
-                  width: `${line.width}px`,
-                  left: `${line.left}px`,
-                  animationDelay: `${line.delay}s`,
-                  backgroundColor: `rgba(31, 41, 55, ${line.darkness})` // Variação de cor baseada em darkness
-                }}
-              />
-            ))}
-            
-            {/* Números abaixo do código de barras (opcional) */}
-            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1].map((digit, idx) => (
-              <div 
-                key={idx}
-                className="barcode-digit"
-                style={{
-                  left: `${idx * 25 + 20}px`,
-                  transitionDelay: `${idx * 0.1 + 0.8}s`
-                }}
-              >
-                {digit}
-              </div>
-            ))}
-          </div>
-          
-          <p className="text-gray-600">Conectando ao banco de dados</p>
+      <div className="flex items-center justify-center h-screen bg-white">
+        <div className="relative w-64 h-16">
+          {/* Barras do código de barras */}
+          {barcodeLines.map(line => (
+            <div
+              key={line.id}
+              className={`barcode-line absolute h-full ${line.isAnimated ? 'animated' : ''}`}
+              style={{
+                width: `${line.width}px`,
+                left: `${line.left}px`,
+                animationDelay: `${line.delay}s`,
+                backgroundColor: `var(--brmania-yellow)`,
+                opacity: 0.9,
+                borderRadius: '1px',
+              }}
+            />
+          ))}
         </div>
       </div>
     )
