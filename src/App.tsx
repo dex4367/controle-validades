@@ -22,7 +22,6 @@ const supabase = createClient(supabaseUrl, supabaseKey)
  */
 function App() {
   const [isLoading, setIsLoading] = useState(true)
-  const [animatedLines, setAnimatedLines] = useState<number[]>([])
 
   // Efeito para garantir que a tela de carregamento seja mostrada por 3 segundos
   useEffect(() => {
@@ -47,83 +46,32 @@ function App() {
     return () => clearTimeout(loadingTimer)
   }, [])
 
-  // Efeito para animar progressivamente as linhas do código de barras
-  useEffect(() => {
-    if (isLoading) {
-      const totalLines = 12
-      const interval = setInterval(() => {
-        setAnimatedLines(prev => {
-          const nextIndex = prev.length
-          if (nextIndex < totalLines) {
-            return [...prev, nextIndex]
-          }
-          clearInterval(interval)
-          return prev
-        })
-      }, 80)
-
-      return () => clearInterval(interval)
-    }
-  }, [isLoading])
-
   // Tela de carregamento enquanto verifica a conexão
   if (isLoading) {
-    // Definir cores para as barras
-    const barColors = [
-      'var(--brmania-yellow)',
-      '#ffdb5c',
-      'var(--brmania-yellow)',
-      '#ffdb5c',
-      'var(--brmania-yellow)',
-      '#ffdb5c',
-      'var(--brmania-yellow)',
-      '#ffdb5c',
-      'var(--brmania-yellow)',
-      '#ffdb5c',
-      'var(--brmania-yellow)',
-      '#ffdb5c',
+    // Configuração das barras de carregamento
+    const bars = [
+      { width: '6px', delay: '0s' },
+      { width: '3px', delay: '0.2s' },
+      { width: '8px', delay: '0.4s' },
+      { width: '4px', delay: '0.6s' },
+      { width: '5px', delay: '0.8s' },
+      { width: '7px', delay: '1.0s' },
+      { width: '4px', delay: '1.2s' },
+      { width: '6px', delay: '1.4s' }
     ]
-    
-    // Gerar as barras do código de barras com larguras variadas
-    const barcodeLines = []
-    const totalLines = 12
-    let leftPosition = 0
-
-    for (let i = 0; i < totalLines; i++) {
-      const width = Math.floor(Math.random() * 6) + 5 // Largura entre 5px e 11px
-      const gap = Math.floor(Math.random() * 4) + 6   // Espaço entre 6px e 10px
-      const height = Math.floor(Math.random() * 15) + 85 // Altura entre 85% e 100%
-      
-      barcodeLines.push({
-        id: i,
-        width: width,
-        left: leftPosition,
-        delay: i * 0.15,  // Aumentar atraso para criar efeito de onda
-        isAnimated: animatedLines.includes(i),
-        color: barColors[i],
-        height: `${height}%`,
-      })
-      
-      leftPosition += width + gap
-    }
 
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-r from-white to-brmania-light">
-        <div className="loading-container p-6 w-80">
-          <div className="relative h-28 w-full mb-2">
-            {/* Barras do código de barras */}
-            {barcodeLines.map(line => (
-              <div
-                key={line.id}
-                className={`barcode-line absolute ${line.isAnimated ? 'animated' : ''}`}
+      <div className="flex items-center justify-center h-screen bg-white">
+        <div className="w-60 h-12 loading-container">
+          <div className="bar-container">
+            {bars.map((bar, index) => (
+              <div 
+                key={index} 
+                className="barcode-line loading-bar-animation"
                 style={{
-                  width: `${line.width}px`,
-                  left: `${line.left}px`,
-                  height: line.height,
-                  bottom: 0,
-                  animationDelay: `${line.delay}s`,
-                  backgroundColor: line.color,
-                  borderRadius: '2px 2px 0 0',
+                  width: bar.width,
+                  animationDelay: bar.delay,
+                  animationDuration: '2s'
                 }}
               />
             ))}
