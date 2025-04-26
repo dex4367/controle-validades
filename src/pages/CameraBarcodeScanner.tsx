@@ -161,7 +161,10 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
   }, []);
 
   const goBack = () => {
-    navigate(-1);
+    // Em vez de navegar, simplesmente fechar o scanner
+    // navigate(-1);
+    stopScanner();
+    onDetect(""); // Emitir um código vazio para sinalizar que o usuário cancelou
   };
 
   return (

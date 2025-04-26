@@ -204,6 +204,13 @@ const MobileReceive = () => {
   }
 
   const handleBarcodeDetected = (detectedBarcode: string) => {
+    // Se o código for vazio, significa que o usuário cancelou o scanner
+    if (!detectedBarcode) {
+      setIsCameraOpen(false)
+      return
+    }
+    
+    // Código de barras detectado com sucesso
     setBarcode(detectedBarcode)
     setIsCameraOpen(false)
     // Executar verificação do produto automaticamente após a detecção
