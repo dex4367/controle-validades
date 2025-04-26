@@ -1,31 +1,39 @@
 import * as XLSX from 'xlsx';
 import { isExpired, calculateDaysRemaining } from '../utils/dateUtils';
+import { Product } from './supabase';
 
+/**
+ * Opções para exportação de dados para Excel
+ */
 interface ExportOptions {
   fileName?: string;
   sheetName?: string;
 }
 
-export function exportToExcel(data: any[], options: ExportOptions = {}): void {
+/**
+ * Exporta dados genéricos para Excel
+ * @param data Array de objetos para exportar
+ * @param options Opções de configuração do arquivo
+ */
+export function exportToExcel(data: Record<string, any>[], options: ExportOptions = {}): void {
   const {
     fileName = 'relatório',
     sheetName = 'Dados'
   } = options;
 
-  // Criar uma workbook
   const wb = XLSX.utils.book_new();
-  
-  // Converter dados para planilha
   const ws = XLSX.utils.json_to_sheet(data);
-  
-  // Adicionar a planilha ao workbook
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  
-  // Trigger para download
   XLSX.writeFile(wb, `${fileName}.xlsx`);
 }
 
-export function generateProductsReport(products: any[], isExpiredParam = false, dateRangeDescription = ''): void {
+/**
+ * Gera relatório de produtos em formato Excel
+ * @param products Lista de produtos para incluir no relatório
+ * @param isExpiredParam Indica se o relatório é de produtos vencidos
+ * @param dateRangeDescription Descrição opcional do período filtrado
+ */
+export function generateProductsReport(products: Product[], isExpiredParam = false, dateRangeDescription = ''): void {
   // Formatar os dados para o Excel
   const data = products.map(product => ({
     'Nome do Produto': product.name,
@@ -58,7 +66,13 @@ export function generateProductsReport(products: any[], isExpiredParam = false, 
   XLSX.writeFile(workbook, fileName);
 }
 
-export function generateExpiringProductsReport(products: any[], days: number, dateRangeDescription = ''): void {
+/**
+ * Gera relatório de produtos próximos do vencimento
+ * @param products Lista de produtos para incluir no relatório
+ * @param days Número de dias para o filtro de vencimento
+ * @param dateRangeDescription Descrição opcional do período filtrado
+ */
+export function generateExpiringProductsReport(products: Product[], days: number, dateRangeDescription = ''): void {
   // Formatar os dados para o Excel
   const data = products.map(product => {
     const daysRemaining = calculateDaysRemaining(product.expiry_date);
@@ -93,8 +107,14 @@ export function generateExpiringProductsReport(products: any[], days: number, da
   XLSX.writeFile(workbook, fileName);
 }
 
-export function exportFilteredProducts(products: any[], filterDescription: string): string {
-  // Formatar os dados para o Excel com mais detalhes
+/**
+ * Exporta lista de produtos filtrados com informações detalhadas
+ * @param products Lista de produtos para incluir no relatório
+ * @param filterDescription Descrição do filtro aplicado
+ * @returns Nome do arquivo gerado
+ */
+export function exportFilteredProducts(products: Product[], filterDescription: string): string {
+  // Formatar os dados para o Excel com informações detalhadas
   const data = products.map(product => {
     const daysRemaining = calculateDaysRemaining(product.expiry_date);
     const expired = isExpired(product.expiry_date);

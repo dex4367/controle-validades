@@ -13,14 +13,18 @@ import MobileReceive from './pages/MobileReceive'
 import Layout from './components/Layout'
 import CategoriesManager from './pages/CategoriesManager'
 
-// Supabase
+// Configuração do Supabase
 const supabaseUrl = 'https://xlqxzgurlnxrnlprlrbw.supabase.co'
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhscXh6Z3VybG54cm5scHJscmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0NDQ4MjUsImV4cCI6MjA2MTAyMDgyNX0.OShVB-J-doJbBqna_0nxyb9w0vJebSWKjm1lAMOkJTE'
 const supabase = createClient(supabaseUrl, supabaseKey)
 
+/**
+ * Componente principal da aplicação
+ */
 function App() {
   const [isLoading, setIsLoading] = useState(true)
 
+  // Verifica a conexão com o Supabase ao iniciar
   useEffect(() => {
     const checkConnection = async () => {
       try {
@@ -36,6 +40,7 @@ function App() {
     checkConnection()
   }, [])
 
+  // Tela de carregamento enquanto verifica a conexão
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-brmania-light">
@@ -48,6 +53,7 @@ function App() {
     )
   }
 
+  // Rotas da aplicação
   return (
     <Routes>
       {/* Rotas para a página mobile de recebimento de produtos */}

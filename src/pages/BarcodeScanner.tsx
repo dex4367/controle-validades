@@ -2,17 +2,27 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getProductsByBarcode } from '../services/supabase'
 import CameraBarcodeScanner from './CameraBarcodeScanner'
+import { Product } from '../services'
+
+interface RiskInfo {
+  level: string;
+  color: string;
+  textColor: string;
+  badge: string;
+}
 
 const BarcodeScanner = () => {
   const navigate = useNavigate()
+  
+  // Estados
   const [barcode, setBarcode] = useState<string>('')
-  const [products, setProducts] = useState<any[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [focusInput, setFocusInput] = useState(true)
   const [showCameraScanner, setShowCameraScanner] = useState(false)
 
-  // Manter o foco no input para facilitar o uso do leitor de código de barras
+  // Efeitos
   useEffect(() => {
     if (focusInput) {
       const inputElement = document.getElementById('barcode-input')
@@ -22,8 +32,8 @@ const BarcodeScanner = () => {
     }
   }, [focusInput])
 
-  // Calcular grau de risco baseado na validade
-  const calculateRisk = (expiryDateStr: string) => {
+  // Funções auxiliares
+  const calculateRisk = (expiryDateStr: string): RiskInfo => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
@@ -64,7 +74,7 @@ const BarcodeScanner = () => {
     }
   }
 
-  // Buscar produtos quando o código de barras for inserido
+  // Funções de manipulação
   const fetchProducts = async (code: string) => {
     if (!code || code.length < 3) return
     
@@ -74,7 +84,7 @@ const BarcodeScanner = () => {
       
       const data = await getProductsByBarcode(code)
       
-      // Ordenar produtos por risco (do maior para o menor)
+      // Ordenar produtos por data de validade
       const sortedProducts = [...data].sort((a, b) => {
         const today = new Date()
         today.setHours(0, 0, 0, 0)
@@ -87,7 +97,6 @@ const BarcodeScanner = () => {
         const diffDaysA = Math.ceil((expiryDateA.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
         const diffDaysB = Math.ceil((expiryDateB.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
         
-        // Ordenar por data de validade (do mais antigo para o mais recente)
         return diffDaysA - diffDaysB
       })
       
@@ -105,7 +114,6 @@ const BarcodeScanner = () => {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Quando Enter for pressionado, buscar o produto
     if (e.key === 'Enter') {
       e.preventDefault()
       if (barcode.trim()) {
@@ -117,7 +125,6 @@ const BarcodeScanner = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setBarcode(e.target.value)
     
-    // Limpar resultados anteriores quando o usuário começa a digitar um novo código
     if (products.length > 0) {
       setProducts([])
     }
@@ -149,14 +156,13 @@ const BarcodeScanner = () => {
     navigate(`/products/edit/${productId}`)
   }
 
-  // Nova função para lidar com o código de barras detectado pela câmera
   const handleBarcodeDetected = (detectedBarcode: string) => {
     setShowCameraScanner(false)
     setBarcode(detectedBarcode)
     fetchProducts(detectedBarcode)
   }
 
-  // Renderização condicional baseada no estado do scanner de câmera
+  // Renderização condicional com câmera
   if (showCameraScanner) {
     return <CameraBarcodeScanner onDetect={handleBarcodeDetected} />
   }

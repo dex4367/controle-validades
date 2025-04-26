@@ -45,10 +45,10 @@ const deduplicateProductsByBarcode = (products: Product[]): Product[] => {
 };
 
 const Reports = () => {
-  const [products, setProducts] = useState<any[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedReportType, setSelectedReportType] = useState<ReportType>(null)
-  const [filteredProducts, setFilteredProducts] = useState<any[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [notification, setNotification] = useState<{
