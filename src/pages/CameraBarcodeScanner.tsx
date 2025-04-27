@@ -18,6 +18,10 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
   const viewfinderRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
+  
+  // Armazenar resultados recentes para evitar falsos positivos
+  const lastResultsRef = useRef<string[]>([]);
+  const lastDetectionTime = useRef<number>(0);
 
   // Estilos inline para garantir que sejam aplicados
   const headerStyle = {
@@ -41,17 +45,63 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
     animation: 'scanAnimation 3s linear infinite'
   };
 
+  // Validação de código EAN/UPC usando algoritmo de checksum (dígito verificador)
+  const isValidBarcode = (code: string): boolean => {
+    // Verificar se o código tem um comprimento razoável
+    if (!code || code.length < 8 || code.length > 13) return false;
+    
+    // Verificar se contém apenas dígitos
+    if (!/^\d+$/.test(code)) return false;
+    
+    // Para códigos EAN/UPC, validar usando o dígito verificador
+    if (code.length === 8 || code.length === 13) {
+      const digits = code.split('').map(Number);
+      const checkDigit = digits.pop()!;
+      
+      let sum = 0;
+      digits.forEach((digit, index) => {
+        // Para EAN-13 e UPC, posições pares têm peso 3, ímpares têm peso 1
+        const weight = (code.length === 13 ? index % 2 === 0 : index % 2 === 1) ? 1 : 3;
+        sum += digit * weight;
+      });
+      
+      const calculatedCheckDigit = (10 - (sum % 10)) % 10;
+      return checkDigit === calculatedCheckDigit;
+    }
+    
+    // Para outros formatos, apenas aceitar se parecer razoável
+    return true;
+  };
+
+  // Verificar se um código apareceu com frequência suficiente para considerá-lo válido
+  const isConfidentResult = (code: string): boolean => {
+    // Adicionar ao histórico de resultados
+    lastResultsRef.current.push(code);
+    
+    // Manter apenas os últimos 10 resultados
+    if (lastResultsRef.current.length > 10) {
+      lastResultsRef.current.shift();
+    }
+    
+    // Contar quantas vezes o código apareceu nos últimos resultados
+    const count = lastResultsRef.current.filter(result => result === code).length;
+    
+    // Considerar válido se aparecer pelo menos 3 vezes nos últimos 10 resultados
+    return count >= 3;
+  };
+
   const startScanner = async () => {
     setError(null);
     setBarcode(null);
     setScanning(true);
+    lastResultsRef.current = [];
 
     try {
       // Carregamento dinâmico do Quagga para reduzir o tamanho do bundle inicial
       const Quagga = (await import('@ericblade/quagga2')).default;
 
       if (viewfinderRef.current) {
-        // Configuração inicial do Quagga
+        // Configuração inicial do Quagga com parâmetros otimizados
         await Quagga.init({
           inputStream: {
             name: 'Live',
@@ -59,19 +109,30 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
             target: viewfinderRef.current,
             constraints: {
               facingMode: 'environment', // Usar a câmera traseira
-              width: { min: 640 },
-              height: { min: 480 },
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 },
               aspectRatio: { min: 1, max: 2 }
+              // Propriedades avançadas removidas por incompatibilidade
             },
           },
           locator: {
             patchSize: 'medium',
-            halfSample: true
+            halfSample: true,
           },
           numOfWorkers: navigator.hardwareConcurrency || 4,
-          frequency: 10,
+          frequency: 20, // Aumentar frequência para mais tentativas de leitura por segundo
           decoder: {
-            readers: ['ean_reader', 'ean_8_reader', 'code_128_reader', 'code_39_reader', 'code_93_reader']
+            readers: [
+              'ean_reader',
+              'ean_8_reader',
+              'code_128_reader',
+              'code_39_reader',
+              'code_93_reader',
+              'upc_reader',
+              'upc_e_reader'
+            ],
+            multiple: false
+            // Configurações de debug removidas para evitar erros
           },
           locate: true
         });
@@ -81,10 +142,21 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
         Quagga.onDetected((result: any) => {
           if (result.codeResult) {
             const code = result.codeResult.code;
-            setBarcode(code);
-            onDetect(code);
-            Quagga.stop();
-            setScanning(false);
+            
+            // Ignorar detecções muito próximas no tempo (evitar duplicações)
+            const now = Date.now();
+            if (now - lastDetectionTime.current < 300) {
+              return;
+            }
+            
+            // Validar o código de barras
+            if (isValidBarcode(code) && isConfidentResult(code)) {
+              setBarcode(code);
+              lastDetectionTime.current = now;
+              onDetect(code);
+              Quagga.stop();
+              setScanning(false);
+            }
           }
         });
 
@@ -132,6 +204,18 @@ const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({ onDetect })
                 10, 
                 drawingCanvas.height - 10
               );
+              
+              // Avaliar a qualidade da leitura
+              if (result.codeResult.format && result.codeResult.code) {
+                const code = result.codeResult.code;
+                // Se o código parece válido, adiciona ao histórico para validação
+                if (isValidBarcode(code)) {
+                  lastResultsRef.current.push(code);
+                  if (lastResultsRef.current.length > 10) {
+                    lastResultsRef.current.shift();
+                  }
+                }
+              }
             }
           }
         });
